@@ -39,6 +39,30 @@ async function initializeDatabase() {
                     ON DELETE RESTRICT ON UPDATE CASCADE
             )
         `);
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(50) NOT NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Create default admin if table is empty
+        const admins = await conn.query("SELECT COUNT(*) as count FROM admin_users");
+        // MariaDB returns BigInt for COUNT(*)
+        const adminCount = Number(admins[0].count);
+        if (adminCount === 0) {
+            const bcrypt = require('bcryptjs');
+            const salt = await bcrypt.genSalt(10);
+            const hash = await bcrypt.hash('admin123', salt);
+            await conn.query(
+                "INSERT INTO admin_users (username, password_hash) VALUES (?, ?)",
+                ['admin', hash]
+            );
+            console.log('Default admin created (admin / admin123)');
+        }
+
         console.log('Database initialized successfully');
     } catch (err) {
         console.error('Error initializing database:', err);
