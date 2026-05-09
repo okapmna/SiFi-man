@@ -1,0 +1,46 @@
+<nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+    <div class="position-sticky">
+        <div class="px-3 mb-4">
+            <h5 class="text-white"><i class="bi bi-shield-lock"></i> Admin Panel</h5>
+        </div>
+        <ul class="nav flex-column mb-auto">
+            <li class="nav-item">
+                <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>" href="/admin/dashboard">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'devices' ? 'active' : '' %>" href="/admin/devices">
+                    <i class="bi bi-cpu"></i> Devices
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/firmwares">
+                    <i class="bi bi-box-seam"></i> Firmwares
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/upload">
+                    <i class="bi bi-cloud-arrow-up"></i> Upload
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/admin/logs">
+                    <i class="bi bi-journal-text"></i> Logs
+                </a>
+            </li>
+        </ul>
+        <hr style="border-color: #444;">
+        <div class="px-3 pb-3">
+            <div class="d-flex align-items-center text-white mb-3">
+                <i class="bi bi-person-circle fs-4 me-2"></i>
+                <span><%= typeof username !== 'undefined' ? username : 'Admin' %></span>
+            </div>
+            <form action="/admin/logout" method="POST">
+                <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </form>
+        </div>
+    </div>
+</nav>
