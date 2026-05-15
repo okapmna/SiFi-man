@@ -17,13 +17,12 @@ router.get('/check', async (req, res) => {
     let conn;
     try {
         conn = await pool.getConnection();
-        // Get the latest firmware for this device type
+        // Phase 3: Only return firmwares explicitly marked as active by admin
         const rows = await conn.query(`
             SELECT f.* 
             FROM firmwares f
             JOIN device_types dt ON f.device_type_id = dt.id
-            WHERE dt.type_name = ?
-            ORDER BY f.created_at DESC 
+            WHERE dt.type_name = ? AND f.is_active = TRUE
             LIMIT 1
         `, [deviceType]);
 

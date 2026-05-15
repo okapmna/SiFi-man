@@ -1,0 +1,186 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar', { activePage: 'firmwares' }) %>
+
+<main class="col-md-9 ms-sm-auto col-lg-10 main-content">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-4 border-bottom" style="border-color: #333 !important;">
+        <h1 class="h2"><i class="bi bi-box-seam me-2"></i>Manage Firmwares</h1>
+        <a href="/admin/upload" class="btn btn-primary">
+            <i class="bi bi-cloud-arrow-up"></i> Upload New Firmware
+        </a>
+    </div>
+
+    <!-- Flash Messages -->
+    <% if (typeof success !== 'undefined' && success) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i><%= success %>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i><%= error %>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    <% } %>
+
+    <!-- Filter Bar -->
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <form method="GET" action="/admin/firmwares" class="d-flex align-items-center gap-3">
+                <label class="form-label mb-0 text-nowrap"><i class="bi bi-funnel"></i> Filter by Device:</label>
+                <select name="device" class="form-select form-select-sm" style="max-width: 260px;" onchange="this.form.submit()">
+                    <option value="">All Device Types</option>
+                    <% deviceTypes.forEach(function(dt) { %>
+                        <option value="<%= dt.type_name %>" <%= deviceFilter === dt.type_name ? 'selected' : '' %>><%= dt.type_name %></option>
+                    <% }); %>
+                </select>
+                <% if (deviceFilter) { %>
+                    <a href="/admin/firmwares" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </a>
+                <% } %>
+                <span class="ms-auto text-muted small">
+                    <span id="firmwareCount">–</span> firmware(s)
+                </span>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firmwares Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Device Type</th>
+                            <th>Version</th>
+                            <th>File</th>
+                            <th>Size</th>
+                            <th>Checksum (MD5)</th>
+                            <th>Status</th>
+                            <th>Notes</th>
+                            <th>Uploaded</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="firmwaresTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Pass data safely via JSON script tag -->
+<script id="firmwares-data" type="application/json">
+    <%- JSON.stringify(firmwares || []) %>
+</script>
+
+<script>
+    (function () {
+        const firmwaresData = JSON.parse(document.getElementById('firmwares-data').textContent);
+        const tbody = document.getElementById('firmwaresTableBody');
+        const countEl = document.getElementById('firmwareCount');
+        countEl.textContent = firmwaresData.length;
+
+        function formatBytes(bytes) {
+            if (!bytes && bytes !== 0) return 'N/A';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        if (firmwaresData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No firmwares found</td></tr>';
+            return;
+        }
+
+        firmwaresData.forEach(function (fw) {
+            const tr = document.createElement('tr');
+            const statusBadge = fw.is_active
+                ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Active</span>'
+                : '<span class="badge bg-secondary">Inactive</span>';
+
+            const activateBtn = fw.is_active
+                ? '<button class="btn btn-sm btn-success me-1" disabled title="Already active"><i class="bi bi-check-circle"></i></button>'
+                : '<button class="btn btn-sm btn-outline-success me-1" onclick="activateFirmware(' + fw.id + ', this)" title="Set as Active"><i class="bi bi-check-circle"></i></button>';
+
+            const deleteBtn = fw.is_active
+                ? '<button class="btn btn-sm btn-outline-danger" disabled title="Cannot delete active firmware"><i class="bi bi-trash"></i></button>'
+                : '<button class="btn btn-sm btn-outline-danger" onclick="deleteFirmware(' + fw.id + ', this)" title="Delete firmware"><i class="bi bi-trash"></i></button>';
+
+            const checksumShort = fw.checksum ? fw.checksum.substring(0, 12) + '…' : 'N/A';
+            const notesStr = fw.notes ? fw.notes.substring(0, 40) + (fw.notes.length > 40 ? '…' : '') : '<span class="text-muted">–</span>';
+            const dateStr = new Date(fw.created_at).toLocaleString();
+
+            tr.innerHTML = `
+                <td>${fw.id}</td>
+                <td><span class="badge bg-primary">${fw.type_name}</span></td>
+                <td><code>${fw.version}</code></td>
+                <td class="text-truncate" style="max-width:160px;" title="${fw.filename}">${fw.filename}</td>
+                <td>${formatBytes(fw.file_size)}</td>
+                <td><code class="text-muted small" title="${fw.checksum || ''}">${checksumShort}</code></td>
+                <td>${statusBadge}</td>
+                <td class="small">${notesStr}</td>
+                <td class="small text-muted">${dateStr}</td>
+                <td class="text-nowrap">
+                    ${activateBtn}
+                    ${deleteBtn}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    })();
+
+    async function activateFirmware(id, btn) {
+        if (!confirm('Set this firmware as the active version for its device type?')) return;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        try {
+            const res = await fetch('/admin/firmwares/' + id + '/activate', { method: 'PATCH' });
+            const data = await res.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-circle"></i>';
+            }
+        } catch (e) {
+            alert('Network error. Please try again.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-circle"></i>';
+        }
+    }
+
+    async function deleteFirmware(id, btn) {
+        if (!confirm('Delete this firmware? This will also remove the file from disk. This action cannot be undone.')) return;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        try {
+            const res = await fetch('/admin/firmwares/' + id, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                const row = btn.closest('tr');
+                row.style.opacity = '0.4';
+                row.style.transition = 'opacity 0.4s';
+                setTimeout(() => { row.remove(); }, 400);
+                const countEl = document.getElementById('firmwareCount');
+                countEl.textContent = parseInt(countEl.textContent) - 1;
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-trash"></i>';
+            }
+        } catch (e) {
+            alert('Network error. Please try again.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-trash"></i>';
+        }
+    }
+</script>
+
+<%- include('partials/footer') %>
