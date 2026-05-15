@@ -15,17 +15,17 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="/admin/firmwares">
+                <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'firmwares' ? 'active' : '' %>" href="/admin/firmwares">
                     <i class="bi bi-box-seam"></i> Firmwares
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="/admin/upload">
+                <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'upload' ? 'active' : '' %>" href="/admin/upload">
                     <i class="bi bi-cloud-arrow-up"></i> Upload
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="/admin/logs">
+                <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'logs' ? 'active' : '' %>" href="/admin/logs">
                     <i class="bi bi-journal-text"></i> Logs
                 </a>
             </li>
