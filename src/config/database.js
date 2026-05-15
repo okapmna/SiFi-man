@@ -48,6 +48,23 @@ async function initializeDatabase() {
             )
         `);
 
+        // Phase 3: Add new columns to firmwares (safe with IF NOT EXISTS)
+        await conn.query(`ALTER TABLE firmwares ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT FALSE`);
+        await conn.query(`ALTER TABLE firmwares ADD COLUMN IF NOT EXISTS file_size INT`);
+        await conn.query(`ALTER TABLE firmwares ADD COLUMN IF NOT EXISTS notes TEXT`);
+
+        // Phase 3: Auto-activate the latest firmware per device type if none are active (migration)
+        await conn.query(`
+            UPDATE firmwares f
+            INNER JOIN (
+                SELECT device_type_id, MAX(id) as max_id
+                FROM firmwares
+                GROUP BY device_type_id
+                HAVING SUM(is_active) = 0
+            ) latest ON f.device_type_id = latest.device_type_id AND f.id = latest.max_id
+            SET f.is_active = TRUE
+        `);
+
         // Create default admin if table is empty
         const admins = await conn.query("SELECT COUNT(*) as count FROM admin_users");
         // MariaDB returns BigInt for COUNT(*)
