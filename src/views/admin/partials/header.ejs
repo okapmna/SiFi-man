@@ -10,19 +10,35 @@
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: 'Inter', sans-serif; }
         .sidebar { min-height: 100vh; background-color: #1e1e1e; border-right: 1px solid #333; padding-top: 20px;}
-        .sidebar .nav-link { color: #adb5bd; padding: 10px 20px; font-weight: 500; }
+        .sidebar .nav-link { color: #c0c6d4; padding: 10px 20px; font-weight: 500; }
         .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background-color: #2b2b2b; }
         .sidebar .nav-link i { margin-right: 10px; }
         .main-content { padding: 30px; }
         .card { background-color: #1e1e1e; border: 1px solid #333; }
-        .card-header { border-bottom: 1px solid #333; background-color: rgba(255,255,255,0.02); }
-        .table { color: #e0e0e0; }
-        .table-dark { --bs-table-bg: #1e1e1e; --bs-table-border-color: #333; }
-        .form-control, .form-select { background-color: #2a2a2a; border: 1px solid #444; color: #fff; }
-        .form-control:focus, .form-select:focus { background-color: #2a2a2a; color: #fff; border-color: #0d6efd; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); }
+        .card-header { border-bottom: 1px solid #333; background-color: rgba(255,255,255,0.02); color: #d0d6e0; }
+        .table { color: #d8dde8; }
+        .table-dark { --bs-table-bg: #1e1e1e; --bs-table-border-color: #333; --bs-table-color: #d8dde8; }
+        .table-dark td, .table-dark th { color: #d8dde8; }
+        .form-control, .form-select { background-color: #2a2a2a; border: 1px solid #444; color: #e0e0e0; }
+        .form-control:focus, .form-select:focus { background-color: #2a2a2a; color: #e0e0e0; border-color: #0d6efd; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); }
+        .form-control::placeholder { color: #7a8092; }
+        .form-control:disabled, .form-select:disabled { background-color: #252525; color: #7a8092; }
         .modal-content { background-color: #1e1e1e; border: 1px solid #333; }
         .modal-header, .modal-footer { border-color: #333; }
         .close { color: #fff; }
+        /* Override Bootstrap muted/secondary text to be legible on dark bg */
+        .text-muted { color: #9aa0b5 !important; }
+        .form-text { color: #9aa0b5 !important; }
+        .form-check-label .text-muted { color: #9aa0b5 !important; }
+        code { color: #82b4ff; background-color: rgba(130,180,255,0.08); padding: 1px 5px; border-radius: 4px; }
+        .alert-warning { color: #e6c96a; background-color: #2d2700; border-color: #5a4800; }
+        .alert-warning a { color: #f0d478; }
+        .small, small { color: #9aa0b5; }
+        .card-body .small, .card-body small { color: #9aa0b5; }
+        /* Keep white text in badges/buttons unaffected */
+        .badge { color: #fff !important; }
+        .btn { color: inherit; }
+        .btn-primary, .btn-success, .btn-danger { color: #fff !important; }
     </style>
 </head>
 <body>

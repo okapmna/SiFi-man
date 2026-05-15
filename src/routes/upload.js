@@ -73,16 +73,17 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
             fs.renameSync(req.file.path, finalPath);
             console.log(`File moved to: ${finalPath}`);
 
-            // Calculate checksum
+            // Calculate checksum and file size
             const fileBuffer = fs.readFileSync(finalPath);
             const hashSum = crypto.createHash('md5');
             hashSum.update(fileBuffer);
             const checksum = hashSum.digest('hex');
+            const fileSize = fileBuffer.length;
 
             // 2. Insert into firmwares table using device_type_id
             await conn.query(
-                "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum) VALUES (?, ?, ?, ?, ?)",
-                [version, deviceTypeId, finalFilename, finalPath, checksum]
+                "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size) VALUES (?, ?, ?, ?, ?, ?)",
+                [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize]
             );
 
             res.status(201).json({
