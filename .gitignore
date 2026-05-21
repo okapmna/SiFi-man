@@ -7,3 +7,4 @@ simulate_upload.js
 simulate_upload.sh
 *.sqlite
 dashboard_plan.md
+db/backups/
