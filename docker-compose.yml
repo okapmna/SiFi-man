@@ -7,13 +7,42 @@ services:
       - "3000:3000"
     env_file:
       - .env
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
-      - shared-network
+      - ota-internal
     volumes:
       - ./firmware_storage:/app/firmware_storage
 
-# DB Network integrate with unimonMQ
+  db:
+    image: mariadb:11
+    container_name: ota_db
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
+    ports:
+      - "3307:3306"
+    volumes:
+      - ota_db_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - ota-internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 networks:
-  shared-network:
-    name: unimonmq-dashboard_app-network
-    external: true
+  ota-internal:
+    name: ota-firmware-network
+    driver: bridge
+
+volumes:
+  ota_db_data:
+    name: ota_db_data
