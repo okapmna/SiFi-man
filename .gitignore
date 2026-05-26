@@ -8,3 +8,4 @@ simulate_upload.sh
 *.sqlite
 dashboard_plan.md
 db/backups/
+system-suggestion.md
