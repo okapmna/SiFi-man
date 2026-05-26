@@ -25,63 +25,39 @@
                         </tr>
                     </thead>
                     <tbody id="devicesTableBody">
-                        <!-- Table content will be rendered via JavaScript below to prevent IDE HTML linter errors -->
+                        <% if (typeof devices === 'undefined' || devices.length === 0) { %>
+                            <tr><td colspan="6" class="text-center py-4">No device types found</td></tr>
+                        <% } else { %>
+                            <% devices.forEach(function(device) { %>
+                                <tr>
+                                    <td><%= device.id %></td>
+                                    <td><span class="badge bg-primary"><%= device.type_name %></span></td>
+                                    <td><%= device.description || '-' %></td>
+                                    <td><%= device.firmware_count %></td>
+                                    <td><%= new Date(device.created_at).toLocaleDateString() %></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info me-1"
+                                            onclick="editDevice(this)"
+                                            data-id="<%= device.id %>"
+                                            data-name="<%= device.type_name %>"
+                                            data-desc="<%= device.description || '' %>">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <% if (device.firmware_count > 0) { %>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteDevice(<%= device.id %>)" disabled title="Cannot delete device with firmwares"><i class="bi bi-trash"></i></button>
+                                        <% } else { %>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteDevice(<%= device.id %>)"><i class="bi bi-trash"></i></button>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        <% } %>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </main>
-
-<script id="devices-data" type="application/json">
-    <%- JSON.stringify(devices || []) %>
-</script>
-
-<script>
-    // Memasukkan data dari server ke variabel JavaScript
-    // Kita mengambil JSON dari tag script tipe "application/json" di atas
-    // untuk menghindari error "Expression expected" pada JS linter VS Code.
-    const devicesData = JSON.parse(document.getElementById('devices-data').textContent);
-    const tbody = document.getElementById('devicesTableBody');
-
-    if (devicesData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">No device types found</td></tr>';
-    } else {
-        devicesData.forEach(function(device) {
-            const tr = document.createElement('tr');
-            
-            const dateStr = new Date(device.created_at).toLocaleDateString();
-            const descStr = device.description || '-';
-            const rawDesc = device.description || '';
-            
-            let deleteBtn = '';
-            if (device.firmware_count > 0) {
-                deleteBtn = '<button class="btn btn-sm btn-outline-danger" onclick="deleteDevice(' + device.id + ')" disabled title="Cannot delete device with firmwares"><i class="bi bi-trash"></i></button>';
-            } else {
-                deleteBtn = '<button class="btn btn-sm btn-outline-danger" onclick="deleteDevice(' + device.id + ')"><i class="bi bi-trash"></i></button>';
-            }
-
-            tr.innerHTML = `
-                <td>${device.id}</td>
-                <td><span class="badge bg-primary">${device.type_name}</span></td>
-                <td>${descStr}</td>
-                <td>${device.firmware_count}</td>
-                <td>${dateStr}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-info me-1" 
-                        onclick="editDevice(this)" 
-                        data-id="${device.id}" 
-                        data-name="${device.type_name}" 
-                        data-desc="${rawDesc}">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    ${deleteBtn}
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-</script>
 
 <!-- Add Device Modal -->
 <div class="modal fade" id="addDeviceModal" tabindex="-1" aria-hidden="true">

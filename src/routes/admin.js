@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const sessionAuth = require('../middleware/sessionAuth');
 
@@ -27,19 +28,27 @@ const upload = multer({
     }
 });
 
+// Rate limiter for login
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: 'Too many login attempts. Please try again in 15 minutes.',
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 // GET /admin/login - Halaman form login
 router.get('/login', (req, res) => {
-    // Jika sudah login, redirect ke dashboard
     if (req.session && req.session.adminId) {
         return res.redirect('/admin/dashboard');
     }
     const error = req.session.error;
-    req.session.error = null; // Clear error setelah ditampilkan
+    req.session.error = null;
     res.render('login', { error });
 });
 
-// POST /admin/login - Proses login
-router.post('/login', async (req, res) => {
+// POST /admin/login - Proses login (with rate limiting)
+router.post('/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
     let conn;
 
@@ -58,7 +67,6 @@ router.post('/login', async (req, res) => {
             }
         }
 
-        // Login gagal
         req.session.error = 'Invalid username or password';
         res.redirect('/admin/login');
     } catch (error) {
@@ -70,18 +78,8 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// POST /admin/logout - Logout & destroy session
+// POST /admin/logout
 router.post('/logout', (req, res) => {
-    req.session.destroy((err) => {
-        if (err) {
-            console.error('Logout error:', err);
-        }
-        res.redirect('/admin/login');
-    });
-});
-
-// GET /admin/logout - Untuk kemudahan via link jika diperlukan, idealnya pakai POST
-router.get('/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) {
             console.error('Logout error:', err);
@@ -379,23 +377,26 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         return res.redirect('/admin/upload?error=Version+and+device+type+are+required');
     }
 
-    const targetDir = path.join(__dirname, '../../firmware_storage', device_type);
-    ensureDir(targetDir);
-
-    const ext = path.extname(req.file.originalname);
-    const finalFilename = `${device_type}_${version}_${Date.now()}${ext}`;
-    const finalPath = path.join(targetDir, finalFilename);
-
     let conn;
+    let finalPath;
     try {
         conn = await pool.getConnection();
 
-        const rows = await conn.query('SELECT id FROM device_types WHERE type_name = ?', [device_type]);
+        const rows = await conn.query('SELECT id, type_name FROM device_types WHERE type_name = ?', [device_type]);
         if (rows.length === 0) {
             if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.redirect('/admin/upload?error=Device+type+not+found');
         }
         const deviceTypeId = rows[0].id;
+        const trustedName = rows[0].type_name;
+
+        // Build file paths using DB-trusted device type name
+        const targetDir = path.join(__dirname, '../../firmware_storage', trustedName);
+        ensureDir(targetDir);
+
+        const ext = path.extname(req.file.originalname);
+        const finalFilename = `${trustedName}_${version}_${Date.now()}${ext}`;
+        finalPath = path.join(targetDir, finalFilename);
 
         // Move file from temp to final destination
         fs.renameSync(req.file.path, finalPath);
@@ -420,9 +421,9 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         res.redirect('/admin/firmwares?success=Firmware+uploaded+successfully');
     } catch (err) {
         console.error('Admin upload error:', err);
-        if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+        if (finalPath && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        res.redirect(`/admin/upload?error=${encodeURIComponent('Upload failed: ' + err.message)}`);
+        res.redirect('/admin/upload?error=Upload+failed');
     } finally {
         if (conn) conn.release();
     }

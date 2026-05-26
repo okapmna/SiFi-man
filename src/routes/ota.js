@@ -36,7 +36,7 @@ router.get('/check', async (req, res) => {
             return res.json({
                 status: 'update_available',
                 version: latest.version,
-                url: `/ota/download/${latest.filename}`,
+                url: `/api/ota/download/${latest.filename}`,
                 checksum: latest.checksum
             });
         } else {
