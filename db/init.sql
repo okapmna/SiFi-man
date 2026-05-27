@@ -47,6 +47,20 @@ CREATE TABLE IF NOT EXISTS admin_users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
+-- Table: audit_logs
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    action        VARCHAR(100) NOT NULL,
+    entity_type   VARCHAR(50),
+    entity_id     INT,
+    details       TEXT,
+    ip_address    VARCHAR(45),
+    performed_by  VARCHAR(100),
+    created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
 -- Seed: Default admin user
 -- Username : admin
 -- Password : admin123  (bcrypt cost=10)
