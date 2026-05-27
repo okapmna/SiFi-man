@@ -3,6 +3,7 @@ const morgan = require('morgan');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const fs = require('fs');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 require('dotenv').config();
@@ -54,6 +55,18 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// CSS cache-busting: set version based on file modification time
+app.use((req, res, next) => {
+  const cssDir = path.join(__dirname, 'public', 'css');
+  let cssVersion = '';
+  try {
+    const files = fs.readdirSync(cssDir).filter(f => f.endsWith('.css'));
+    cssVersion = files.map(f => fs.statSync(path.join(cssDir, f)).mtimeMs).join('');
+  } catch (_) { cssVersion = Date.now().toString(); }
+  res.locals.cssVersion = require('crypto').createHash('md5').update(cssVersion).digest('hex').slice(0, 8);
+  next();
+});
 
 // View Routes
 const viewRoutes = require('./routes/view');
