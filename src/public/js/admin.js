@@ -1,3 +1,13 @@
+document.addEventListener('DOMContentLoaded', function () {
+    // Device filter dropdown — submit form on change
+    const deviceSelect = document.querySelector('select[name="device"]');
+    if (deviceSelect) {
+        deviceSelect.addEventListener('change', function () {
+            this.form.submit();
+        });
+    }
+});
+
 // Function to open the edit modal with populated data
 function editDevice(element) {
     const id = element.getAttribute('data-id');

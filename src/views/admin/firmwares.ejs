@@ -28,7 +28,7 @@
         <div class="card-body py-2">
             <form method="GET" action="/admin/firmwares" class="d-flex align-items-center gap-3">
                 <label class="form-label mb-0 text-nowrap"><i class="bi bi-funnel"></i> Filter by Device:</label>
-                <select name="device" class="form-select form-select-sm" style="max-width: 260px;" onchange="this.form.submit()">
+                <select name="device" class="form-select form-select-sm form-select-device-filter" style="max-width: 260px;">
                     <option value="">All Device Types</option>
                     <% deviceTypes.forEach(function(dt) { %>
                         <option value="<%= dt.type_name %>" <%= deviceFilter === dt.type_name ? 'selected' : '' %>><%= dt.type_name %></option>
