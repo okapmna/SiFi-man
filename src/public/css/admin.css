@@ -1,39 +1,39 @@
 :root {
-  --color-bg: #F6F2F2;
+  --color-bg: #F6F6F7;
   --color-surface: #FFFFFF;
-  --color-sidebar: #312A37;
-  --color-primary: #D55551;
-  --color-primary-hover: #c04946;
-  --color-primary-light: rgba(213, 85, 81, 0.1);
-  --color-muted: #83909E;
-  --color-text: #7B7C7D;
-  --color-heading: #312A37;
+  --color-sidebar: #263145;
+  --color-primary: #7D8196;
+  --color-primary-hover: #636779;
+  --color-primary-light: rgba(125, 129, 150, 0.1);
+  --color-muted: #7A8C91;
+  --color-text: #9CACBE;
+  --color-heading: #263145;
   --color-border: #d4d8dc;
-  --color-sidebar-text: #F6F2F2;
-  --color-sidebar-muted: #83909E;
-  --color-sidebar-hover-bg: rgba(213, 85, 81, 0.15);
-  --color-sidebar-active-bg: rgba(213, 85, 81, 0.2);
-  --color-table-header: #312A37;
-  --color-table-header-text: #F6F2F2;
-  --color-table-stripe: rgba(131, 144, 158, 0.04);
-  --color-table-hover: rgba(213, 85, 81, 0.04);
+  --color-sidebar-text: #F6F6F7;
+  --color-sidebar-muted: #7A8C91;
+  --color-sidebar-hover-bg: rgba(125, 129, 150, 0.15);
+  --color-sidebar-active-bg: rgba(125, 129, 150, 0.2);
+  --color-table-header: #263145;
+  --color-table-header-text: #F6F6F7;
+  --color-table-stripe: rgba(122, 140, 145, 0.04);
+  --color-table-hover: rgba(125, 129, 150, 0.04);
   --color-input-bg: #FFFFFF;
   --color-input-border: #d4d8dc;
-  --color-input-focus: #D55551;
-  --color-input-focus-shadow: rgba(213, 85, 81, 0.2);
+  --color-input-focus: #7D8196;
+  --color-input-focus-shadow: rgba(125, 129, 150, 0.2);
   --success: #4caf50;
   --success-bg: #e8f5e9;
   --success-border: #a5d6a7;
   --warning: #ff9800;
   --warning-bg: #fff8e1;
   --warning-border: #ffe082;
-  --danger: #D55551;
+  --danger: #7D8196;
   --danger-bg: #fbe9e7;
-  --danger-border: #D55551;
-  --info: #83909E;
-  --shadow-sm: 0 1px 3px rgba(49, 42, 55, 0.06);
-  --shadow-md: 0 4px 12px rgba(49, 42, 55, 0.08);
-  --shadow-lg: 0 8px 24px rgba(49, 42, 55, 0.12);
+  --danger-border: #7D8196;
+  --info: #7A8C91;
+  --shadow-sm: 0 1px 3px rgba(38, 49, 69, 0.06);
+  --shadow-md: 0 4px 12px rgba(38, 49, 69, 0.08);
+  --shadow-lg: 0 8px 24px rgba(38, 49, 69, 0.12);
   --radius: 10px;
   --radius-sm: 6px;
   --radius-xs: 4px;
@@ -72,13 +72,13 @@ hr { border-color: var(--color-border); opacity: 0.5; }
   background-color: var(--color-sidebar);
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 12px rgba(49, 42, 55, 0.15);
+  box-shadow: 2px 0 12px rgba(38, 49, 69, 0.15);
   z-index: 100;
 }
 
 .sidebar .sidebar-brand {
   padding: 24px 20px 20px;
-  border-bottom: 1px solid rgba(131, 144, 158, 0.15);
+  border-bottom: 1px solid rgba(122, 140, 145, 0.15);
 }
 
 .sidebar .sidebar-brand h5 {
@@ -133,7 +133,7 @@ hr { border-color: var(--color-border); opacity: 0.5; }
 
 .sidebar .sidebar-footer {
   padding: 16px 20px;
-  border-top: 1px solid rgba(131, 144, 158, 0.15);
+  border-top: 1px solid rgba(122, 140, 145, 0.15);
   margin-top: auto;
 }
 
@@ -291,7 +291,7 @@ hr { border-color: var(--color-border); opacity: 0.5; }
 .form-control::placeholder { color: var(--color-muted); opacity: 0.7; }
 
 .form-control:disabled, .form-select:disabled {
-  background-color: rgba(131, 144, 158, 0.06);
+  background-color: rgba(122, 140, 145, 0.06);
   color: var(--color-muted);
   cursor: not-allowed;
 }
@@ -327,7 +327,7 @@ hr { border-color: var(--color-border); opacity: 0.5; }
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(213, 85, 81, 0.3);
+  box-shadow: 0 4px 12px rgba(125, 129, 150, 0.3);
 }
 
 .btn-primary:disabled {
@@ -354,8 +354,8 @@ hr { border-color: var(--color-border); opacity: 0.5; }
 }
 
 .btn-secondary:hover {
-  background-color: #6d7a88;
-  border-color: #6d7a88;
+  background-color: #65777C;
+  border-color: #65777C;
   color: #fff;
 }
 
@@ -459,7 +459,7 @@ hr { border-color: var(--color-border); opacity: 0.5; }
 
 .alert-danger {
   background-color: var(--danger-bg);
-  color: #c04946;
+  color: #636779;
   border-left: 4px solid var(--danger);
 }
 
@@ -479,7 +479,7 @@ hr { border-color: var(--color-border); opacity: 0.5; }
   text-align: center;
   cursor: pointer;
   transition: all var(--transition);
-  background-color: rgba(131, 144, 158, 0.03);
+  background-color: rgba(122, 140, 145, 0.03);
 }
 
 .drop-zone:hover, .drop-zone.active {
