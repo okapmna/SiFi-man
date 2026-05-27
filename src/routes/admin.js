@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const sessionAuth = require('../middleware/sessionAuth');
+const { addLog, getLogs } = require('../middleware/auditLog');
 
 // Helper: robust is_active conversion (handles boolean, number, string, Buffer)
 function isActive(val) {
@@ -69,10 +70,12 @@ router.post('/login', loginLimiter, async (req, res) => {
             if (isMatch) {
                 req.session.adminId = admin.id;
                 req.session.username = admin.username;
+                await addLog({ action: 'login', details: 'Login successful', ip_address: req.ip, performed_by: username });
                 return res.redirect('/admin/dashboard');
             }
         }
 
+        await addLog({ action: 'login_failed', details: `Failed login attempt for: ${username}`, ip_address: req.ip, performed_by: username || 'unknown' });
         req.session.error = 'Invalid username or password';
         res.redirect('/admin/login');
     } catch (error) {
@@ -85,11 +88,15 @@ router.post('/login', loginLimiter, async (req, res) => {
 });
 
 // POST /admin/logout
-router.post('/logout', (req, res) => {
-    req.session.destroy((err) => {
+router.post('/logout', async (req, res) => {
+    const username = req.session.username;
+    const adminId = req.session.adminId;
+    const ip = req.ip;
+    req.session.destroy(async (err) => {
         if (err) {
             console.error('Logout error:', err);
         }
+        await addLog({ action: 'logout', performed_by: username, ip_address: ip });
         res.redirect('/admin/login');
     });
 });
@@ -98,6 +105,108 @@ router.post('/logout', (req, res) => {
 // PROTECTED ROUTES
 // ==========================================
 router.use(sessionAuth);
+
+// GET /admin/settings - Halaman pengaturan akun
+router.get('/settings', async (req, res) => {
+    const success = req.session.success;
+    const error = req.session.error;
+    req.session.success = null;
+    req.session.error = null;
+
+    let conn;
+    let adminInfo = null;
+    try {
+        conn = await pool.getConnection();
+        const rows = await conn.query(
+            'SELECT id, username, created_at FROM admin_users WHERE id = ?',
+            [req.session.adminId]
+        );
+        if (rows.length > 0) {
+            adminInfo = rows[0];
+        }
+    } catch (err) {
+        console.error('Settings error:', err);
+    } finally {
+        if (conn) conn.release();
+    }
+
+    res.render('admin/settings', {
+        username: req.session.username,
+        activePage: 'settings',
+        adminInfo,
+        success,
+        error
+    });
+});
+
+// POST /admin/settings/password - Proses ganti password
+const changePasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: 'Too many password change attempts. Please try again in 15 minutes.',
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+router.post('/settings/password', changePasswordLimiter, async (req, res) => {
+    const { current_password, new_password, confirm_password } = req.body;
+    const adminId = req.session.adminId;
+
+    if (!current_password || !new_password || !confirm_password) {
+        req.session.error = 'All fields are required';
+        return res.redirect('/admin/settings');
+    }
+
+    if (new_password.length < 8) {
+        req.session.error = 'New password must be at least 8 characters';
+        return res.redirect('/admin/settings');
+    }
+
+    if (new_password !== confirm_password) {
+        req.session.error = 'New password and confirmation do not match';
+        return res.redirect('/admin/settings');
+    }
+
+    if (current_password === new_password) {
+        req.session.error = 'New password must be different from current password';
+        return res.redirect('/admin/settings');
+    }
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const rows = await conn.query('SELECT id, password_hash FROM admin_users WHERE id = ?', [adminId]);
+
+        if (rows.length === 0) {
+            req.session.error = 'User not found';
+            return res.redirect('/admin/settings');
+        }
+
+        const isMatch = await bcrypt.compare(current_password, rows[0].password_hash);
+        if (!isMatch) {
+            await addLog({ action: 'password_change_failed', performed_by: req.session.username, ip_address: req.ip });
+            req.session.error = 'Current password is incorrect';
+            return res.redirect('/admin/settings');
+        }
+
+        const newHash = await bcrypt.hash(new_password, 10);
+        await conn.query('UPDATE admin_users SET password_hash = ? WHERE id = ?', [newHash, adminId]);
+        await addLog({ action: 'password_changed', performed_by: req.session.username, ip_address: req.ip });
+
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('Session destroy error after password change:', err);
+            }
+            res.redirect('/admin/login');
+        });
+    } catch (error) {
+        console.error('Change password error:', error);
+        req.session.error = 'Internal server error';
+        res.redirect('/admin/settings');
+    } finally {
+        if (conn) conn.release();
+    }
+});
 
 // GET /admin/dashboard
 router.get('/dashboard', async (req, res) => {
@@ -167,10 +276,11 @@ router.post('/devices', async (req, res) => {
     try {
         const { type_name, description } = req.body;
         conn = await pool.getConnection();
-        await conn.query(
+        const result = await conn.query(
             "INSERT INTO device_types (type_name, description) VALUES (?, ?)",
             [type_name, description]
         );
+        await addLog({ action: 'device_created', entity_type: 'device_type', entity_id: Number(result.insertId), details: `Created device type: ${type_name}`, performed_by: req.session.username, ip_address: req.ip });
         res.redirect('/admin/devices');
     } catch (error) {
         console.error('Add device error:', error);
@@ -192,6 +302,7 @@ router.put('/devices/:id', async (req, res) => {
             "UPDATE device_types SET type_name = ?, description = ? WHERE id = ?",
             [type_name, description, deviceId]
         );
+        await addLog({ action: 'device_updated', entity_type: 'device_type', entity_id: Number(deviceId), details: `Updated device type ID ${deviceId}: ${type_name}`, performed_by: req.session.username, ip_address: req.ip });
         res.json({ success: true });
     } catch (error) {
         console.error('Edit device error:', error);
@@ -209,12 +320,14 @@ router.delete('/devices/:id', async (req, res) => {
         conn = await pool.getConnection();
         
         // Check if there are firmwares
+        const deviceRows = await conn.query("SELECT type_name FROM device_types WHERE id = ?", [deviceId]);
         const firmwares = await conn.query("SELECT COUNT(*) as count FROM firmwares WHERE device_type_id = ?", [deviceId]);
         if (Number(firmwares[0].count) > 0) {
             return res.status(400).json({ error: 'Cannot delete device with existing firmwares' });
         }
 
         await conn.query("DELETE FROM device_types WHERE id = ?", [deviceId]);
+        await addLog({ action: 'device_deleted', entity_type: 'device_type', entity_id: Number(deviceId), details: `Deleted device type ID ${deviceId}: ${deviceRows.length > 0 ? deviceRows[0].type_name : 'unknown'}`, performed_by: req.session.username, ip_address: req.ip });
         res.json({ success: true });
     } catch (error) {
         console.error('Delete device error:', error);
@@ -295,16 +408,17 @@ router.patch('/firmwares/:id/activate', async (req, res) => {
         const firmwareId = req.params.id;
         conn = await pool.getConnection();
 
-        const rows = await conn.query('SELECT device_type_id FROM firmwares WHERE id = ?', [firmwareId]);
+        const rows = await conn.query('SELECT f.device_type_id, f.version, dt.type_name FROM firmwares f JOIN device_types dt ON f.device_type_id = dt.id WHERE f.id = ?', [firmwareId]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Firmware not found' });
         }
-        const deviceTypeId = rows[0].device_type_id;
+        const { device_type_id: deviceTypeId, version, type_name } = rows[0];
 
         // Deactivate all firmwares for this device type, then activate target
         await conn.query('UPDATE firmwares SET is_active = FALSE WHERE device_type_id = ?', [deviceTypeId]);
         await conn.query('UPDATE firmwares SET is_active = TRUE WHERE id = ?', [firmwareId]);
 
+        await addLog({ action: 'firmware_activated', entity_type: 'firmware', entity_id: Number(firmwareId), details: `Activated firmware ${version} for ${type_name}`, performed_by: req.session.username, ip_address: req.ip });
         res.json({ success: true });
     } catch (err) {
         console.error('Activate firmware error:', err);
@@ -321,7 +435,7 @@ router.delete('/firmwares/:id', async (req, res) => {
         const firmwareId = req.params.id;
         conn = await pool.getConnection();
 
-        const rows = await conn.query('SELECT file_path, is_active FROM firmwares WHERE id = ?', [firmwareId]);
+        const rows = await conn.query('SELECT f.file_path, f.is_active, f.version, dt.type_name FROM firmwares f JOIN device_types dt ON f.device_type_id = dt.id WHERE f.id = ?', [firmwareId]);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Firmware not found' });
         }
@@ -330,7 +444,7 @@ router.delete('/firmwares/:id', async (req, res) => {
             return res.status(400).json({ error: 'Cannot delete the active firmware. Please activate another firmware first.' });
         }
 
-        const filePath = rows[0].file_path;
+        const { file_path: filePath, version, type_name } = rows[0];
 
         // Remove file from disk first, then DB
         if (filePath) {
@@ -344,6 +458,7 @@ router.delete('/firmwares/:id', async (req, res) => {
         }
 
         await conn.query('DELETE FROM firmwares WHERE id = ?', [firmwareId]);
+        await addLog({ action: 'firmware_deleted', entity_type: 'firmware', entity_id: Number(firmwareId), details: `Deleted firmware ${version} for ${type_name}`, performed_by: req.session.username, ip_address: req.ip });
 
         res.json({ success: true });
     } catch (err) {
@@ -432,6 +547,8 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
             [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive]
         );
 
+        await addLog({ action: isActive ? 'firmware_uploaded_active' : 'firmware_uploaded', entity_type: 'firmware', details: `Uploaded firmware ${version} for ${trustedName} (${finalFilename})`, performed_by: req.session.username, ip_address: req.ip });
+
         res.redirect('/admin/firmwares?success=Firmware+uploaded+successfully');
     } catch (err) {
         console.error('Admin upload error:', err);
@@ -441,6 +558,35 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
     } finally {
         if (conn) conn.release();
     }
+});
+
+// ==========================================
+// AUDIT LOGS
+// ==========================================
+
+// GET /admin/logs — view audit logs (paginated, filterable)
+router.get('/logs', async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const action = req.query.action || '';
+    const entity_type = req.query.entity_type || '';
+
+    const result = await getLogs({
+        action: action || undefined,
+        entity_type: entity_type || undefined,
+        page,
+        limit: 50
+    });
+
+    res.render('admin/logs', {
+        username: req.session.username,
+        activePage: 'logs',
+        logs: result.logs,
+        total: result.total,
+        page: result.page,
+        totalPages: result.totalPages,
+        filterAction: action,
+        filterEntity: entity_type
+    });
 });
 
 module.exports = router;
