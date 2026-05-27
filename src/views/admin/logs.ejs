@@ -1,0 +1,142 @@
+<%- include('partials/header') %>
+<%- include('partials/sidebar', { activePage: 'logs' }) %>
+
+<main class="col-md-9 ms-sm-auto col-lg-10 main-content">
+    <div class="page-header">
+        <h1 class="h2"><i class="bi bi-journal-text"></i> Audit Logs</h1>
+    </div>
+
+    <!-- Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="/admin/logs" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Action</label>
+                    <select name="action" class="form-select">
+                        <option value="">All Actions</option>
+                        <option value="login" <%= filterAction === 'login' ? 'selected' : '' %>>Login</option>
+                        <option value="login_failed" <%= filterAction === 'login_failed' ? 'selected' : '' %>>Login Failed</option>
+                        <option value="logout" <%= filterAction === 'logout' ? 'selected' : '' %>>Logout</option>
+                        <option value="password_changed" <%= filterAction === 'password_changed' ? 'selected' : '' %>>Password Changed</option>
+                        <option value="password_change_failed" <%= filterAction === 'password_change_failed' ? 'selected' : '' %>>Password Change Failed</option>
+                        <option value="device_created" <%= filterAction === 'device_created' ? 'selected' : '' %>>Device Created</option>
+                        <option value="device_updated" <%= filterAction === 'device_updated' ? 'selected' : '' %>>Device Updated</option>
+                        <option value="device_deleted" <%= filterAction === 'device_deleted' ? 'selected' : '' %>>Device Deleted</option>
+                        <option value="firmware_uploaded" <%= filterAction === 'firmware_uploaded' ? 'selected' : '' %>>Firmware Uploaded</option>
+                        <option value="firmware_uploaded_active" <%= filterAction === 'firmware_uploaded_active' ? 'selected' : '' %>>Firmware Uploaded (Active)</option>
+                        <option value="firmware_activated" <%= filterAction === 'firmware_activated' ? 'selected' : '' %>>Firmware Activated</option>
+                        <option value="firmware_deleted" <%= filterAction === 'firmware_deleted' ? 'selected' : '' %>>Firmware Deleted</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Entity Type</label>
+                    <select name="entity_type" class="form-select">
+                        <option value="">All Types</option>
+                        <option value="device_type" <%= filterEntity === 'device_type' ? 'selected' : '' %>>Device Type</option>
+                        <option value="firmware" <%= filterEntity === 'firmware' ? 'selected' : '' %>>Firmware</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-2"></i>Activity Log</span>
+            <span class="badge bg-secondary"><%= total %> entries</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Action</th>
+                            <th>Entity</th>
+                            <th>Details</th>
+                            <th>Performed By</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (logs.length === 0) { %>
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    <i class="bi bi-inbox me-2"></i>No logs found
+                                </td>
+                            </tr>
+                        <% } else { %>
+                            <% logs.forEach(function(log) { %>
+                                <tr>
+                                    <td class="text-nowrap small">
+                                        <%= new Date(log.created_at).toLocaleString() %>
+                                    </td>
+                                    <td>
+                                        <% if (log.action === 'login') { %>
+                                            <span class="badge bg-success">Login</span>
+                                        <% } else if (log.action === 'login_failed') { %>
+                                            <span class="badge bg-danger">Login Failed</span>
+                                        <% } else if (log.action === 'logout') { %>
+                                            <span class="badge bg-secondary">Logout</span>
+                                        <% } else if (log.action === 'password_changed') { %>
+                                            <span class="badge bg-warning text-dark">Password Changed</span>
+                                        <% } else if (log.action === 'password_change_failed') { %>
+                                            <span class="badge bg-danger">Password Change Failed</span>
+                                        <% } else if (log.action === 'device_created') { %>
+                                            <span class="badge bg-info text-dark">Device Created</span>
+                                        <% } else if (log.action === 'device_updated') { %>
+                                            <span class="badge bg-info text-dark">Device Updated</span>
+                                        <% } else if (log.action === 'device_deleted') { %>
+                                            <span class="badge bg-danger">Device Deleted</span>
+                                        <% } else if (log.action === 'firmware_uploaded' || log.action === 'firmware_uploaded_active') { %>
+                                            <span class="badge bg-primary">Firmware Uploaded</span>
+                                        <% } else if (log.action === 'firmware_activated') { %>
+                                            <span class="badge bg-success">Firmware Activated</span>
+                                        <% } else if (log.action === 'firmware_deleted') { %>
+                                            <span class="badge bg-danger">Firmware Deleted</span>
+                                        <% } else { %>
+                                            <span class="badge bg-secondary"><%= log.action %></span>
+                                        <% } %>
+                                    </td>
+                                    <td class="small">
+                                        <%= log.entity_type ? log.entity_type + ' #' + log.entity_id : '-' %>
+                                    </td>
+                                    <td class="small"><%= log.details || '-' %></td>
+                                    <td><%= log.performed_by || '-' %></td>
+                                    <td class="small text-muted font-monospace"><%= log.ip_address || '-' %></td>
+                                </tr>
+                            <% }); %>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <% if (totalPages > 1) { %>
+            <div class="card-footer">
+                <nav>
+                    <ul class="pagination pagination-sm justify-content-center mb-0">
+                        <li class="page-item <%= page <= 1 ? 'disabled' : '' %>">
+                            <a class="page-link" href="?page=<%= page - 1 %><%= filterAction ? '&action=' + encodeURIComponent(filterAction) : '' %><%= filterEntity ? '&entity_type=' + encodeURIComponent(filterEntity) : '' %>">Previous</a>
+                        </li>
+                        <% for (let p = 1; p <= totalPages; p++) { %>
+                            <li class="page-item <%= p === page ? 'active' : '' %>">
+                                <a class="page-link" href="?page=<%= p %><%= filterAction ? '&action=' + encodeURIComponent(filterAction) : '' %><%= filterEntity ? '&entity_type=' + encodeURIComponent(filterEntity) : '' %>"><%= p %></a>
+                            </li>
+                        <% } %>
+                        <li class="page-item <%= page >= totalPages ? 'disabled' : '' %>">
+                            <a class="page-link" href="?page=<%= page + 1 %><%= filterAction ? '&action=' + encodeURIComponent(filterAction) : '' %><%= filterEntity ? '&entity_type=' + encodeURIComponent(filterEntity) : '' %>">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        <% } %>
+    </div>
+</main>
+
+<%- include('partials/footer') %>
