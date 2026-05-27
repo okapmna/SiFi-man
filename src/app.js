@@ -13,6 +13,9 @@ const routes = require('./routes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy (Cloudflare Tunnel, nginx, etc.)
+app.set('trust proxy', true);
+
 // Security Middleware
 app.use(helmet({
     contentSecurityPolicy: {
