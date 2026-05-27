@@ -102,12 +102,12 @@
                                         <% if (fw.is_active) { %>
                                             <button class="btn btn-sm btn-success me-1" disabled title="Already active"><i class="bi bi-check-circle"></i></button>
                                         <% } else { %>
-                                            <button class="btn btn-sm btn-outline-success me-1" onclick="activateFirmware(<%= fw.id %>, this)" title="Set as Active"><i class="bi bi-check-circle"></i></button>
+                                            <button class="btn btn-sm btn-outline-success me-1 btn-activate-fw" data-id="<%= fw.id %>" title="Set as Active"><i class="bi bi-check-circle"></i></button>
                                         <% } %>
                                         <% if (fw.is_active) { %>
                                             <button class="btn btn-sm btn-outline-danger" disabled title="Cannot delete active firmware"><i class="bi bi-trash"></i></button>
                                         <% } else { %>
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteFirmware(<%= fw.id %>, this)" title="Delete firmware"><i class="bi bi-trash"></i></button>
+                                            <button class="btn btn-sm btn-outline-danger btn-delete-fw" data-id="<%= fw.id %>" title="Delete firmware"><i class="bi bi-trash"></i></button>
                                         <% } %>
                                     </td>
                                 </tr>
@@ -161,14 +161,14 @@
                 const tbody = row.closest('tbody');
                 row.style.opacity = '0.4';
                 row.style.transition = 'opacity 0.4s';
-                setTimeout(() => {
+                setTimeout(function() {
                     row.remove();
                     if (tbody && tbody.querySelectorAll('tr').length === 0) {
                         tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No firmwares found</td></tr>';
                     }
                 }, 400);
-                const countEl = document.getElementById('firmwareCount');
-                countEl.textContent = parseInt(countEl.textContent) - 1;
+                var cEl = document.getElementById('firmwareCount');
+                cEl.textContent = parseInt(cEl.textContent) - 1;
             } else {
                 alert('Error: ' + (data.error || 'Unknown error'));
                 btn.disabled = false;
@@ -180,6 +180,20 @@
             btn.innerHTML = '<i class="bi bi-trash"></i>';
         }
     }
+
+    // Bind activate buttons
+    document.querySelectorAll('.btn-activate-fw').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            activateFirmware(this.getAttribute('data-id'), this);
+        });
+    });
+
+    // Bind delete buttons
+    document.querySelectorAll('.btn-delete-fw').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            deleteFirmware(this.getAttribute('data-id'), this);
+        });
+    });
 </script>
 
 <%- include('partials/footer') %>

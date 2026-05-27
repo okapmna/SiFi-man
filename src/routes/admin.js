@@ -9,6 +9,12 @@ const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const sessionAuth = require('../middleware/sessionAuth');
 
+// Helper: robust is_active conversion (handles boolean, number, string, Buffer)
+function isActive(val) {
+    if (Buffer.isBuffer(val)) return val[0] === 1;
+    return Number(val) === 1;
+}
+
 // ==========================================
 // MULTER SETUP FOR ADMIN UPLOAD
 // ==========================================
@@ -261,7 +267,7 @@ router.get('/firmwares', async (req, res) => {
                 ...f,
                 id: Number(f.id),
                 device_type_id: Number(f.device_type_id),
-                is_active: Boolean(f.is_active),
+                is_active: isActive(f.is_active),
                 file_size: fileSize
             };
         });
@@ -320,8 +326,7 @@ router.delete('/firmwares/:id', async (req, res) => {
             return res.status(404).json({ error: 'Firmware not found' });
         }
 
-        const isActive = Number(rows[0].is_active) === 1;
-        if (isActive) {
+        if (isActive(rows[0].is_active)) {
             return res.status(400).json({ error: 'Cannot delete the active firmware. Please activate another firmware first.' });
         }
 

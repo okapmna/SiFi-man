@@ -80,12 +80,11 @@
                             <label class="form-label fw-semibold">
                                 <i class="bi bi-file-earmark-binary me-1"></i> Firmware File (.bin) <span class="text-danger">*</span>
                             </label>
-                            <div id="dropZone" class="drop-zone" onclick="document.getElementById('firmware').click()">
+                            <div id="dropZone" class="drop-zone">
                                 <i class="bi bi-cloud-upload fs-2 mb-2 text-muted d-block"></i>
                                 <span id="dropZoneText" class="text-muted">Click to select .bin file</span>
                             </div>
-                            <input type="file" id="firmware" name="firmware" accept=".bin" required class="d-none"
-                                   onchange="updateDropZone(this)">
+                            <input type="file" id="firmware" name="firmware" accept=".bin" required class="d-none">
                         </div>
 
                         <!-- Set Active -->
@@ -151,7 +150,13 @@
     }
 
     // Drag & drop support
-    const dropZone = document.getElementById('dropZone');
+    var dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('click', function() {
+        document.getElementById('firmware').click();
+    });
+    document.getElementById('firmware').addEventListener('change', function() {
+        updateDropZone(this);
+    });
     dropZone.addEventListener('dragover', function(e) {
         e.preventDefault();
         dropZone.classList.add('active');
