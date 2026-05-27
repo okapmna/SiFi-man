@@ -230,7 +230,7 @@ router.get('/firmwares', async (req, res) => {
         const deviceFilter = req.query.device || '';
 
         let query = `
-            SELECT f.id, f.version, f.filename, f.file_size, f.checksum,
+            SELECT f.id, f.version, f.filename, f.file_path, f.file_size, f.checksum,
                    f.is_active, f.notes, f.created_at, dt.type_name, dt.id as device_type_id
             FROM firmwares f
             JOIN device_types dt ON f.device_type_id = dt.id
@@ -319,17 +319,26 @@ router.delete('/firmwares/:id', async (req, res) => {
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Firmware not found' });
         }
-        if (rows[0].is_active) {
+
+        const isActive = Number(rows[0].is_active) === 1;
+        if (isActive) {
             return res.status(400).json({ error: 'Cannot delete the active firmware. Please activate another firmware first.' });
         }
 
         const filePath = rows[0].file_path;
-        await conn.query('DELETE FROM firmwares WHERE id = ?', [firmwareId]);
 
-        // Remove file from disk
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
+        // Remove file from disk first, then DB
+        if (filePath) {
+            try {
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+            } catch (fileErr) {
+                console.error('Failed to delete file:', fileErr);
+            }
         }
+
+        await conn.query('DELETE FROM firmwares WHERE id = ?', [firmwareId]);
 
         res.json({ success: true });
     } catch (err) {

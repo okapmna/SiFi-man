@@ -158,9 +158,15 @@
             const data = await res.json();
             if (data.success) {
                 const row = btn.closest('tr');
+                const tbody = row.closest('tbody');
                 row.style.opacity = '0.4';
                 row.style.transition = 'opacity 0.4s';
-                setTimeout(() => { row.remove(); }, 400);
+                setTimeout(() => {
+                    row.remove();
+                    if (tbody && tbody.querySelectorAll('tr').length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No firmwares found</td></tr>';
+                    }
+                }, 400);
                 const countEl = document.getElementById('firmwareCount');
                 countEl.textContent = parseInt(countEl.textContent) - 1;
             } else {
