@@ -106,6 +106,11 @@ router.post('/logout', async (req, res) => {
 // ==========================================
 router.use(sessionAuth);
 
+// GET /admin — redirect to dashboard
+router.get('/', (req, res) => {
+    res.redirect('/admin/dashboard');
+});
+
 // GET /admin/settings - Halaman pengaturan akun
 router.get('/settings', async (req, res) => {
     const success = req.session.success;
@@ -228,6 +233,7 @@ router.get('/dashboard', async (req, res) => {
 
         res.render('admin/dashboard', {
             username: req.session.username,
+            activePage: 'dashboard',
             totalDevices: Number(totalDevices[0].count),
             totalFirmwares: Number(totalFirmwares[0].count),
             recentUploads
@@ -260,6 +266,7 @@ router.get('/devices', async (req, res) => {
 
         res.render('admin/devices', {
             username: req.session.username,
+            activePage: 'devices',
             devices: formattedDevices
         });
     } catch (error) {
@@ -387,6 +394,7 @@ router.get('/firmwares', async (req, res) => {
 
         res.render('admin/firmwares', {
             username: req.session.username,
+            activePage: 'firmwares',
             firmwares: enriched,
             deviceTypes,
             deviceFilter,
@@ -481,6 +489,7 @@ router.get('/upload', async (req, res) => {
         const deviceTypes = await conn.query('SELECT id, type_name FROM device_types ORDER BY type_name');
         res.render('admin/upload', {
             username: req.session.username,
+            activePage: 'upload',
             deviceTypes,
             success: req.query.success || null,
             error: req.query.error || null

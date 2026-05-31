@@ -6,6 +6,7 @@ const pool = require('../config/database');
 const auth = require('../middleware/auth');
 const fs = require('fs');
 const crypto = require('crypto');
+const { addLog } = require('../middleware/auditLog');
 
 // Helper to ensure directory exists
 const ensureDir = (dir) => {
@@ -86,6 +87,14 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
             "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size) VALUES (?, ?, ?, ?, ?, ?)",
             [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize]
         );
+
+        await addLog({
+            action: 'firmware_uploaded_api',
+            entity_type: 'firmware',
+            details: `API upload: ${version} for ${trustedName} (${finalFilename})`,
+            performed_by: 'api_key',
+            ip_address: req.ip
+        });
 
         res.status(201).json({
             status: 'success',
