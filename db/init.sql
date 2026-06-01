@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS firmwares (
     is_active      BOOLEAN      NOT NULL DEFAULT FALSE,
     file_size      INT,
     notes          TEXT,
+    uploaded_by    VARCHAR(100) DEFAULT NULL,
     created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_firmware_device_type
         FOREIGN KEY (device_type_id)

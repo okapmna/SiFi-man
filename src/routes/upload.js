@@ -36,8 +36,8 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
         return res.status(400).json({ status: 'error', message: 'No file uploaded' });
     }
 
-    const { version, device_type } = req.body;
-    console.log(`Received upload request: device=${device_type}, version=${version}`);
+    const { version, device_type, release_notes, uploaded_by } = req.body;
+    console.log(`Received upload request: device=${device_type}, version=${version}, uploaded_by=${uploaded_by || 'unknown'}`);
     
     if (!version || !device_type) {
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -84,15 +84,15 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
 
         // 2. Insert into firmwares table using device_type_id
         await conn.query(
-            "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size) VALUES (?, ?, ?, ?, ?, ?)",
-            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize]
+            "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, release_notes || null, uploaded_by || 'api_key']
         );
 
         await addLog({
             action: 'firmware_uploaded_api',
             entity_type: 'firmware',
-            details: `API upload: ${version} for ${trustedName} (${finalFilename})`,
-            performed_by: 'api_key',
+            details: `API upload: ${version} for ${trustedName} (${finalFilename}) by ${uploaded_by || 'api_key'}`,
+            performed_by: uploaded_by || 'api_key',
             ip_address: req.ip
         });
 
@@ -105,6 +105,8 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
                 device_type_id: deviceTypeId,
                 filename: finalFilename,
                 checksum,
+                uploaded_by: uploaded_by || 'api_key',
+                release_notes: release_notes || null,
                 storage_path: finalPath
             }
         });

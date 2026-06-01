@@ -357,7 +357,7 @@ router.get('/firmwares', async (req, res) => {
 
         let query = `
             SELECT f.id, f.version, f.filename, f.file_path, f.file_size, f.checksum,
-                   f.is_active, f.notes, f.created_at, dt.type_name, dt.id as device_type_id
+                   f.is_active, f.notes, f.uploaded_by, f.created_at, dt.type_name, dt.id as device_type_id
             FROM firmwares f
             JOIN device_types dt ON f.device_type_id = dt.id
         `;
@@ -552,8 +552,8 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         }
 
         await conn.query(
-            'INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive]
+            'INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, is_active, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive, req.session.username]
         );
 
         await addLog({ action: isActive ? 'firmware_uploaded_active' : 'firmware_uploaded', entity_type: 'firmware', details: `Uploaded firmware ${version} for ${trustedName} (${finalFilename})`, performed_by: req.session.username, ip_address: req.ip });
