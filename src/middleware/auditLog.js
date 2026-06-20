@@ -25,8 +25,8 @@ async function getLogs({ action, entity_type, page = 1, limit = 50 }) {
         const params = [];
 
         if (action) {
-            conditions.push('action = ?');
-            params.push(action);
+            conditions.push('action LIKE ?');
+            params.push(action + '%');
         }
         if (entity_type) {
             conditions.push('entity_type = ?');

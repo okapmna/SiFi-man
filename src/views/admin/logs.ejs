@@ -1,6 +1,38 @@
 <%- include('partials/header') %>
 <%- include('partials/sidebar', { activePage: 'logs' }) %>
 
+<%
+const BADGE_MAP = {
+    login:                  { label: 'Login',              cls: 'bg-success' },
+    login_failed:           { label: 'Login Failed',       cls: 'bg-danger' },
+    logout:                 { label: 'Logout',             cls: 'bg-secondary' },
+    password_changed:       { label: 'Password Changed',   cls: 'bg-warning text-dark' },
+    password_change_failed: { label: 'Password Change Failed', cls: 'bg-danger' },
+    device_created:         { label: 'Device Created',     cls: 'bg-info text-dark' },
+    device_updated:         { label: 'Device Updated',     cls: 'bg-info text-dark' },
+    device_deleted:         { label: 'Device Deleted',     cls: 'bg-danger' },
+    firmware_uploaded:      { label: 'Firmware Uploaded',  cls: 'bg-primary' },
+    firmware_uploaded_active: { label: 'Firmware Uploaded', cls: 'bg-primary' },
+    firmware_uploaded_api:  { label: 'Firmware Uploaded',  cls: 'bg-primary' },
+    firmware_activated:     { label: 'Firmware Activated', cls: 'bg-success' },
+    firmware_deleted:       { label: 'Firmware Deleted',   cls: 'bg-danger' },
+};
+
+const FILTER_ACTIONS = [
+    { value: 'login',               label: 'Login' },
+    { value: 'login_failed',        label: 'Login Failed' },
+    { value: 'logout',              label: 'Logout' },
+    { value: 'password_changed',    label: 'Password Changed' },
+    { value: 'password_change_failed', label: 'Password Change Failed' },
+    { value: 'device_created',      label: 'Device Created' },
+    { value: 'device_updated',      label: 'Device Updated' },
+    { value: 'device_deleted',      label: 'Device Deleted' },
+    { value: 'firmware_uploaded',   label: 'Firmware Uploaded' },
+    { value: 'firmware_activated',  label: 'Firmware Activated' },
+    { value: 'firmware_deleted',    label: 'Firmware Deleted' },
+];
+%>
+
 <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
     <div class="page-header">
         <h1 class="h2"><i class="bi bi-journal-text"></i> Audit Logs</h1>
@@ -14,18 +46,9 @@
                     <label class="form-label">Action</label>
                     <select name="action" class="form-select">
                         <option value="">All Actions</option>
-                        <option value="login" <%= filterAction === 'login' ? 'selected' : '' %>>Login</option>
-                        <option value="login_failed" <%= filterAction === 'login_failed' ? 'selected' : '' %>>Login Failed</option>
-                        <option value="logout" <%= filterAction === 'logout' ? 'selected' : '' %>>Logout</option>
-                        <option value="password_changed" <%= filterAction === 'password_changed' ? 'selected' : '' %>>Password Changed</option>
-                        <option value="password_change_failed" <%= filterAction === 'password_change_failed' ? 'selected' : '' %>>Password Change Failed</option>
-                        <option value="device_created" <%= filterAction === 'device_created' ? 'selected' : '' %>>Device Created</option>
-                        <option value="device_updated" <%= filterAction === 'device_updated' ? 'selected' : '' %>>Device Updated</option>
-                        <option value="device_deleted" <%= filterAction === 'device_deleted' ? 'selected' : '' %>>Device Deleted</option>
-                        <option value="firmware_uploaded" <%= filterAction === 'firmware_uploaded' ? 'selected' : '' %>>Firmware Uploaded</option>
-                        <option value="firmware_uploaded_active" <%= filterAction === 'firmware_uploaded_active' ? 'selected' : '' %>>Firmware Uploaded (Active)</option>
-                        <option value="firmware_activated" <%= filterAction === 'firmware_activated' ? 'selected' : '' %>>Firmware Activated</option>
-                        <option value="firmware_deleted" <%= filterAction === 'firmware_deleted' ? 'selected' : '' %>>Firmware Deleted</option>
+                        <% FILTER_ACTIONS.forEach(function(a) { %>
+                            <option value="<%= a.value %>" <%= filterAction === a.value ? 'selected' : '' %>><%= a.label %></option>
+                        <% }); %>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -73,36 +96,13 @@
                             </tr>
                         <% } else { %>
                             <% logs.forEach(function(log) { %>
+                                <% var cfg = BADGE_MAP[log.action] || { label: log.action, cls: 'bg-secondary' }; %>
                                 <tr>
                                     <td class="text-nowrap small">
                                         <%= new Date(log.created_at).toLocaleString() %>
                                     </td>
                                     <td>
-                                        <% if (log.action === 'login') { %>
-                                            <span class="badge bg-success">Login</span>
-                                        <% } else if (log.action === 'login_failed') { %>
-                                            <span class="badge bg-danger">Login Failed</span>
-                                        <% } else if (log.action === 'logout') { %>
-                                            <span class="badge bg-secondary">Logout</span>
-                                        <% } else if (log.action === 'password_changed') { %>
-                                            <span class="badge bg-warning text-dark">Password Changed</span>
-                                        <% } else if (log.action === 'password_change_failed') { %>
-                                            <span class="badge bg-danger">Password Change Failed</span>
-                                        <% } else if (log.action === 'device_created') { %>
-                                            <span class="badge bg-info text-dark">Device Created</span>
-                                        <% } else if (log.action === 'device_updated') { %>
-                                            <span class="badge bg-info text-dark">Device Updated</span>
-                                        <% } else if (log.action === 'device_deleted') { %>
-                                            <span class="badge bg-danger">Device Deleted</span>
-                                        <% } else if (log.action === 'firmware_uploaded' || log.action === 'firmware_uploaded_active') { %>
-                                            <span class="badge bg-primary">Firmware Uploaded</span>
-                                        <% } else if (log.action === 'firmware_activated') { %>
-                                            <span class="badge bg-success">Firmware Activated</span>
-                                        <% } else if (log.action === 'firmware_deleted') { %>
-                                            <span class="badge bg-danger">Firmware Deleted</span>
-                                        <% } else { %>
-                                            <span class="badge bg-secondary"><%= log.action %></span>
-                                        <% } %>
+                                        <span class="badge <%= cfg.cls %>"><%= cfg.label %></span>
                                     </td>
                                     <td class="small">
                                         <%= log.entity_type ? log.entity_type + ' #' + log.entity_id : '-' %>
