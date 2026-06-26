@@ -1,6 +1,6 @@
-# OTA Firmware Updater
+# SiFi-man
 
-OTA firmware management system with admin dashboard.
+Simple firmware management system for OTA update with admin dashboard.
 
 ## Features
 - Admin dashboard with session-based authentication
