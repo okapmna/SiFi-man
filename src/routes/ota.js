@@ -2,11 +2,30 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
+
+// Rate limiter: firmware check (60 requests per 15 minutes)
+const checkLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 60,
+    message: { status: 'error', message: 'Too many check requests. Try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+// Rate limiter: firmware download (10 requests per 15 minutes)
+const downloadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { status: 'error', message: 'Too many download requests. Try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 
 // Check for update
 // ESP32 usually sends headers: x-ESP32-version, x-ESP32-STA-MAC, x-ESP32-mode
-router.get('/check', async (req, res) => {
+router.get('/check', checkLimiter, async (req, res) => {
     const currentVersion = req.query.version || req.headers['x-esp32-version'];
     const deviceType = req.query.device || req.headers['x-esp32-device'] || 'esp32';
 
@@ -51,7 +70,7 @@ router.get('/check', async (req, res) => {
 });
 
 // Download firmware
-router.get('/download/:filename', async (req, res) => {
+router.get('/download/:filename', downloadLimiter, async (req, res) => {
     const filename = req.params.filename;
     
     let conn;
