@@ -87,6 +87,16 @@
                             <input type="file" id="firmware" name="firmware" accept=".bin" required class="d-none">
                         </div>
 
+                        <!-- Source Repo -->
+                        <div class="mb-4">
+                            <label for="source_repo" class="form-label fw-semibold">
+                                <i class="bi bi-git me-1"></i> Source Repository
+                            </label>
+                            <input type="text" class="form-control" id="source_repo" name="source_repo"
+                                   placeholder="e.g. https://github.com/owner/repo">
+                            <div class="form-text">Optional: GitHub repository URL where this firmware was built.</div>
+                        </div>
+
                         <!-- Set Active -->
                         <div class="mb-4">
                             <div class="form-check form-switch">
@@ -119,7 +129,7 @@
                     <h6 class="text-muted mb-2"><i class="bi bi-info-circle me-1"></i> Notes</h6>
                     <ul class="text-muted small mb-0">
                         <li>Only <strong>.bin</strong> files are accepted.</li>
-                        <li>MD5 checksum is calculated automatically after upload.</li>
+                        <li><strong>SHA256</strong> checksum is calculated automatically after upload.</li>
                         <li>File is stored in <code>firmware_storage/{device_type}/</code>.</li>
                         <li>Each device type can have only <strong>one active</strong> firmware at a time.</li>
                     </ul>

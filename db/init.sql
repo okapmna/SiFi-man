@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS firmwares (
     file_size      INT,
     notes          TEXT,
     uploaded_by    VARCHAR(100) DEFAULT NULL,
+    source_repo    VARCHAR(255) DEFAULT NULL,
     created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_firmware_device_type
         FOREIGN KEY (device_type_id)
@@ -62,6 +63,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
+-- Grant privileges for ota_user from any host (for Adminer)
+GRANT ALL PRIVILEGES ON ota_firmware_db.* TO 'ota_user'@'%' IDENTIFIED BY 'ota_password_app';
+FLUSH PRIVILEGES;
+
 -- Seed: Default admin user
 -- Username : admin
 -- Password : admin123  (bcrypt cost=10)

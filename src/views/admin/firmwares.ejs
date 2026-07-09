@@ -57,17 +57,18 @@
                             <th>Version</th>
                             <th>File</th>
                             <th>Size</th>
-                            <th>Checksum (MD5)</th>
+                            <th>Checksum</th>
                             <th>Status</th>
                             <th>Notes</th>
                             <th>Uploaded By</th>
+                            <th>Source Repo</th>
                             <th>Uploaded</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="firmwaresTableBody">
                         <% if (typeof firmwares === 'undefined' || firmwares.length === 0) { %>
-                            <tr><td colspan="10" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No firmwares found</td></tr>
+                            <tr><td colspan="11" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No firmwares found</td></tr>
                         <% } else { %>
                             <% firmwares.forEach(function(fw) { %>
                                 <tr class="fw-row" style="cursor:pointer;"
@@ -80,6 +81,7 @@
                                     data-status="<%= fw.is_active ? 'Active' : 'Inactive' %>"
                                     data-notes="<%= fw.notes || '' %>"
                                     data-uploadedby="<%= fw.uploaded_by || '' %>"
+                                    data-sourcerepo="<%= fw.source_repo || '' %>"
                                     data-createdat="<%= new Date(fw.created_at).toISOString() %>"
                                     data-filepath="<%= fw.file_path || '' %>">
                                     <td><span class="badge bg-primary"><%= fw.type_name %></span></td>
@@ -114,6 +116,7 @@
                                             –
                                         <% } %>
                                     </td>
+                                    <td class="small text-muted" title="<%= fw.source_repo || '' %>"><%= fw.source_repo ? (fw.source_repo.substring(0, 20) + (fw.source_repo.length > 20 ? '…' : '')) : '–' %></td>
                                     <td class="small text-muted"><%= new Date(fw.created_at).toLocaleString() %></td>
                                     <td class="text-nowrap">
                                         <% if (fw.is_active) { %>
@@ -153,10 +156,11 @@
                         <tr><th>Filename</th><td><code id="detail-filename"></code></td></tr>
                         <tr><th>File Path</th><td><small class="text-muted" id="detail-filepath"></small></td></tr>
                         <tr><th>File Size</th><td id="detail-size"></td></tr>
-                        <tr><th>Checksum (MD5)</th><td><code style="word-break:break-all;" id="detail-checksum"></code></td></tr>
+                        <tr><th>SHA256 Checksum</th><td><code style="word-break:break-all;" id="detail-checksum"></code></td></tr>
                         <tr><th>Status</th><td><span id="detail-status"></span></td></tr>
                         <tr><th>Notes</th><td id="detail-notes" style="white-space:pre-wrap;"></td></tr>
                         <tr><th>Uploaded By</th><td id="detail-uploadedby"></td></tr>
+                        <tr><th>Source Repo</th><td><code id="detail-sourcerepo"></code></td></tr>
                         <tr><th>Uploaded At</th><td id="detail-createdat"></td></tr>
                     </tbody>
                 </table>
@@ -212,7 +216,7 @@
                 setTimeout(function() {
                     row.remove();
                     if (tbody && tbody.querySelectorAll('tr').length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No firmwares found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No firmwares found</td></tr>';
                     }
                 }, 400);
                 var cEl = document.getElementById('firmwareCount');
@@ -256,6 +260,7 @@
             document.getElementById('detail-status').className = 'badge ' + (row.getAttribute('data-status') === 'Active' ? 'bg-success' : 'bg-secondary');
             document.getElementById('detail-notes').textContent = row.getAttribute('data-notes') || '–';
             document.getElementById('detail-uploadedby').textContent = row.getAttribute('data-uploadedby') || '–';
+            document.getElementById('detail-sourcerepo').textContent = row.getAttribute('data-sourcerepo') || '–';
             var d = new Date(row.getAttribute('data-createdat'));
             document.getElementById('detail-createdat').textContent = d.toLocaleString();
             detailModal.show();

@@ -357,7 +357,8 @@ router.get('/firmwares', async (req, res) => {
 
         let query = `
             SELECT f.id, f.version, f.filename, f.file_path, f.file_size, f.checksum,
-                   f.is_active, f.notes, f.uploaded_by, f.created_at, dt.type_name, dt.id as device_type_id
+                   f.is_active, f.notes, f.uploaded_by, f.source_repo, f.created_at,
+                   dt.type_name, dt.id as device_type_id
             FROM firmwares f
             JOIN device_types dt ON f.device_type_id = dt.id
         `;
@@ -508,7 +509,7 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         return res.redirect('/admin/upload?error=No+file+uploaded');
     }
 
-    const { version, device_type, notes, set_active } = req.body;
+    const { version, device_type, notes, set_active, source_repo } = req.body;
 
     if (!version || !device_type) {
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -539,9 +540,9 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         // Move file from temp to final destination
         fs.renameSync(req.file.path, finalPath);
 
-        // Calculate checksum and file size
+        // Calculate SHA256 checksum and file size
         const fileBuffer = fs.readFileSync(finalPath);
-        const checksum = crypto.createHash('md5').update(fileBuffer).digest('hex');
+        const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
         const fileSize = fileBuffer.length;
 
         const isActive = set_active === 'on' || set_active === '1' || set_active === 'true';
@@ -552,8 +553,8 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         }
 
         await conn.query(
-            'INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, is_active, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive, req.session.username]
+            'INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, is_active, uploaded_by, source_repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive, req.session.username, source_repo || null]
         );
 
         await addLog({ action: isActive ? 'firmware_uploaded_active' : 'firmware_uploaded', entity_type: 'firmware', details: `Uploaded firmware ${version} for ${trustedName} (${finalFilename})`, performed_by: req.session.username, ip_address: req.ip });
