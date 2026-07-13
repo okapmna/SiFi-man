@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 -- ------------------------------------------------------------
 -- Grant privileges for ota_user from any host (for Adminer)
-GRANT ALL PRIVILEGES ON ota_firmware_db.* TO 'ota_user'@'%' IDENTIFIED BY 'ota_password_app';
+GRANT ALL PRIVILEGES ON ota_firmware_db.* TO 'ota_user'@'%';
 FLUSH PRIVILEGES;
 
 -- Seed: Default admin user
