@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     username      VARCHAR(50)  NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    permissions   JSON         NOT NULL DEFAULT ('{"upload":true,"activate":true,"remove":true,"edit_detail":true,"edit_user":false}'),
+    permissions   JSON         NOT NULL DEFAULT ('{"upload":true,"activate":true,"remove":true,"edit_detail":true,"edit_user":true}'),
     created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -76,8 +76,9 @@ FLUSH PRIVILEGES;
 --   node -e "const b=require('bcryptjs');b.hash('PASSWORD_BARU',10).then(console.log)"
 -- lalu UPDATE admin_users SET password_hash='HASH_BARU' WHERE username='admin';
 -- ------------------------------------------------------------
-INSERT IGNORE INTO admin_users (username, password_hash)
+INSERT IGNORE INTO admin_users (username, password_hash, permissions)
 VALUES (
     'admin',
-    '$2b$10$pjKrNHAtdTtLJNQvqrqe/.qKf8/Qg/4jkFD8K/CmBT4a3nrJr.FEi'
+    '$2b$10$pjKrNHAtdTtLJNQvqrqe/.qKf8/Qg/4jkFD8K/CmBT4a3nrJr.FEi',
+    '{"upload":true,"activate":true,"remove":true,"edit_detail":true,"edit_user":true}'
 );
