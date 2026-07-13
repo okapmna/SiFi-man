@@ -10,10 +10,11 @@ SET time_zone = '+00:00';
 -- Table: device_types
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS device_types (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    type_name   VARCHAR(50)  NOT NULL UNIQUE,
-    description TEXT,
-    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    type_name      VARCHAR(50)  NOT NULL UNIQUE,
+    description    TEXT,
+    webhook_secret VARCHAR(64)  DEFAULT NULL COMMENT 'Per-device API key for GitHub Actions upload',
+    created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------

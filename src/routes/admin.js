@@ -252,13 +252,12 @@ router.get('/devices', async (req, res) => {
     try {
         conn = await pool.getConnection();
         const devices = await conn.query(`
-            SELECT dt.id, dt.type_name, dt.description, dt.created_at,
+            SELECT dt.id, dt.type_name, dt.description, dt.webhook_secret, dt.created_at,
                    (SELECT COUNT(*) FROM firmwares f WHERE f.device_type_id = dt.id) as firmware_count
             FROM device_types dt
             ORDER BY dt.created_at DESC
         `);
         
-        // Helper untuk parse BigInt jika perlu, walau di view bisa langsung toString
         const formattedDevices = devices.map(d => ({
             ...d,
             firmware_count: Number(d.firmware_count)
@@ -282,17 +281,40 @@ router.post('/devices', async (req, res) => {
     let conn;
     try {
         const { type_name, description } = req.body;
+        // Auto-generate a unique webhook_secret for every new device
+        const webhookSecret = crypto.randomBytes(32).toString('hex');
         conn = await pool.getConnection();
         const result = await conn.query(
-            "INSERT INTO device_types (type_name, description) VALUES (?, ?)",
-            [type_name, description]
+            "INSERT INTO device_types (type_name, description, webhook_secret) VALUES (?, ?, ?)",
+            [type_name, description, webhookSecret]
         );
         await addLog({ action: 'device_created', entity_type: 'device_type', entity_id: Number(result.insertId), details: `Created device type: ${type_name}`, performed_by: req.session.username, ip_address: req.ip });
         res.redirect('/admin/devices');
     } catch (error) {
         console.error('Add device error:', error);
-        // Handle constraint errors properly in a real app, here we just return error text
         res.status(500).send('Failed to add device. Maybe duplicate name?');
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// POST /admin/devices/:id/regenerate-secret — regenerate webhook secret
+router.post('/devices/:id/regenerate-secret', async (req, res) => {
+    let conn;
+    try {
+        const deviceId = req.params.id;
+        const newSecret = crypto.randomBytes(32).toString('hex');
+        conn = await pool.getConnection();
+        const rows = await conn.query('SELECT type_name FROM device_types WHERE id = ?', [deviceId]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Device not found' });
+        }
+        await conn.query('UPDATE device_types SET webhook_secret = ? WHERE id = ?', [newSecret, deviceId]);
+        await addLog({ action: 'device_secret_regenerated', entity_type: 'device_type', entity_id: Number(deviceId), details: `Regenerated webhook secret for: ${rows[0].type_name}`, performed_by: req.session.username, ip_address: req.ip });
+        res.json({ success: true, secret: newSecret });
+    } catch (error) {
+        console.error('Regenerate secret error:', error);
+        res.status(500).json({ error: 'Failed to regenerate secret' });
     } finally {
         if (conn) conn.release();
     }

@@ -20,13 +20,14 @@
                             <th>Name</th>
                             <th>Description</th>
                             <th>Firmwares</th>
+                            <th>API Key</th>
                             <th>Created At</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="devicesTableBody">
                         <% if (typeof devices === 'undefined' || devices.length === 0) { %>
-                            <tr><td colspan="6" class="text-center py-4">No device types found</td></tr>
+                            <tr><td colspan="7" class="text-center py-4">No device types found</td></tr>
                         <% } else { %>
                             <% devices.forEach(function(device) { %>
                                 <tr>
@@ -34,14 +35,56 @@
                                     <td><span class="badge bg-primary"><%= device.type_name %></span></td>
                                     <td><%= device.description || '-' %></td>
                                     <td><%= device.firmware_count %></td>
+                                    <td>
+                                        <% if (device.webhook_secret) { %>
+                                        <div class="input-group input-group-sm" style="min-width:220px">
+                                            <input type="password"
+                                                   class="form-control form-control-sm font-monospace secret-input"
+                                                   value="<%= device.webhook_secret %>"
+                                                   id="secret-<%= device.id %>"
+                                                   readonly>
+                                            <button class="btn btn-outline-secondary btn-sm"
+                                                    type="button"
+                                                    title="Show/Hide"
+                                                    onclick="toggleSecret(<%= device.id %>)">
+                                                <i class="bi bi-eye" id="eye-<%= device.id %>"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary btn-sm"
+                                                    type="button"
+                                                    title="Copy"
+                                                    onclick="copySecret(<%= device.id %>)">
+                                                <i class="bi bi-clipboard" id="clip-<%= device.id %>"></i>
+                                            </button>
+                                        </div>
+                                        <% } else { %>
+                                            <span class="text-muted fst-italic small">No secret — regenerate</span>
+                                        <% } %>
+                                    </td>
                                     <td><%= new Date(device.created_at).toLocaleDateString() %></td>
                                     <td>
+                                        <!-- Guide button -->
+                                        <button class="btn btn-sm btn-outline-success me-1 btn-guide-device"
+                                                title="GitHub Actions Guide"
+                                                data-id="<%= device.id %>"
+                                                data-name="<%= device.type_name %>"
+                                                data-secret="<%= device.webhook_secret || '' %>">
+                                            <i class="bi bi-book"></i>
+                                        </button>
+                                        <!-- Edit button -->
                                         <button class="btn btn-sm btn-outline-info me-1 btn-edit-device"
-                                            data-id="<%= device.id %>"
-                                            data-name="<%= device.type_name %>"
-                                            data-desc="<%= device.description || '' %>">
+                                                data-id="<%= device.id %>"
+                                                data-name="<%= device.type_name %>"
+                                                data-desc="<%= device.description || '' %>">
                                             <i class="bi bi-pencil"></i>
                                         </button>
+                                        <!-- Regenerate secret -->
+                                        <button class="btn btn-sm btn-outline-warning me-1 btn-regen-secret"
+                                                title="Regenerate API Key"
+                                                data-id="<%= device.id %>"
+                                                data-name="<%= device.type_name %>">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                        <!-- Delete -->
                                         <% if (device.firmware_count > 0) { %>
                                             <button class="btn btn-sm btn-outline-danger" disabled title="Cannot delete device with firmwares"><i class="bi bi-trash"></i></button>
                                         <% } else { %>
@@ -58,7 +101,9 @@
     </div>
 </main>
 
-<!-- Add Device Modal -->
+<!-- ===================================================
+     Add Device Modal
+     =================================================== -->
 <div class="modal fade" id="addDeviceModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -77,6 +122,10 @@
                         <label class="form-label">Description</label>
                         <textarea class="form-control" name="description" rows="3" placeholder="Optional description..."></textarea>
                     </div>
+                    <div class="alert alert-info py-2 small mb-0">
+                        <i class="bi bi-key-fill me-1"></i>
+                        An <strong>API Key</strong> will be automatically generated for this device.
+                    </div>
                 </div>
                 <div class="modal-footer border-top-0">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -87,7 +136,9 @@
     </div>
 </div>
 
-<!-- Edit Device Modal -->
+<!-- ===================================================
+     Edit Device Modal
+     =================================================== -->
 <div class="modal fade" id="editDeviceModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -116,28 +167,284 @@
     </div>
 </div>
 
+<!-- ===================================================
+     GitHub Actions Guide Modal
+     =================================================== -->
+<div class="modal fade modal-xl" id="guideModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg,#1a1a2e,#16213e); color:#fff;">
+                <h5 class="modal-title">
+                    <i class="bi bi-github me-2"></i>
+                    GitHub Actions Guide — <span id="guide-device-name" class="text-warning fw-bold"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+
+                <!-- Step 1 -->
+                <h6 class="fw-bold mb-2"><span class="badge bg-primary me-2">1</span>Set GitHub Repository Secrets</h6>
+                <p class="text-muted small mb-2">
+                    Go to your GitHub repo → <strong>Settings → Secrets and variables → Actions → New repository secret</strong>,
+                    then add the following secrets:
+                </p>
+                <table class="table table-sm table-bordered mb-3">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Secret Name</th>
+                            <th>Value</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>OTA_UPLOAD_URL</code></td>
+                            <td>
+                                <input type="text" class="form-control form-control-sm" id="guide-upload-url"
+                                       placeholder="https://your-server/api/upload" value="">
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="copyEl('guide-upload-url')" title="Copy">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><code>OTA_API_KEY</code></td>
+                            <td>
+                                <div class="input-group input-group-sm">
+                                    <input type="password" class="form-control form-control-sm font-monospace"
+                                           id="guide-api-key" readonly>
+                                    <button class="btn btn-outline-secondary btn-sm" type="button"
+                                            onclick="toggleEl('guide-api-key', 'guide-eye')">
+                                        <i class="bi bi-eye" id="guide-eye"></i>
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="copyEl('guide-api-key')" title="Copy">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Step 2 -->
+                <h6 class="fw-bold mb-2"><span class="badge bg-primary me-2">2</span>Add Workflow File to Your Repo</h6>
+                <p class="text-muted small mb-2">
+                    Create <code>.github/workflows/ota-upload.yml</code> in your firmware repository with the content below.
+                    Adjust <code>FIRMWARE</code> path and <code>VERSION</code> source to match your project.
+                </p>
+
+                <div class="position-relative">
+                    <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2"
+                            onclick="copyEl('guide-yaml')" title="Copy YAML">
+                        <i class="bi bi-clipboard"></i> Copy
+                    </button>
+                    <textarea id="guide-yaml" class="form-control font-monospace small" rows="48" readonly
+                              style="background:#1e1e2e; color:#cdd6f4; border:none; resize:none; font-size:0.78rem;"></textarea>
+                </div>
+
+                <!-- Step 3 -->
+                <h6 class="fw-bold mt-3 mb-2"><span class="badge bg-primary me-2">3</span>Activate Firmware After Upload</h6>
+                <p class="text-muted small mb-0">
+                    After upload, the firmware will be listed in the <strong>Firmwares</strong> page with status <em>Inactive</em>.
+                    Click <strong>Activate</strong> in the dashboard to make ESP32 devices receive this update.
+                    <br>Or add <code>-F "set_active=true"</code> to the curl command to auto-activate on upload.
+                </p>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    // Edit device buttons
-    document.querySelectorAll('.btn-edit-device').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            editDevice(this);
-        });
-    });
-
-    // Delete device buttons
-    document.querySelectorAll('.btn-delete-device').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            deleteDevice(this.getAttribute('data-id'));
-        });
-    });
-
-    // Edit device form submit
-    var editForm = document.getElementById('editDeviceForm');
-    if (editForm) {
-        editForm.addEventListener('submit', function(e) {
-            submitEditDevice(e);
-        });
+// ---- Toggle secret visibility ----
+function toggleSecret(id) {
+    const input = document.getElementById('secret-' + id);
+    const eye   = document.getElementById('eye-' + id);
+    if (input.type === 'password') {
+        input.type = 'text';
+        eye.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        eye.className = 'bi bi-eye';
     }
+}
+
+function copySecret(id) {
+    const input = document.getElementById('secret-' + id);
+    const clip  = document.getElementById('clip-' + id);
+    navigator.clipboard.writeText(input.value).then(() => {
+        clip.className = 'bi bi-check2';
+        setTimeout(() => { clip.className = 'bi bi-clipboard'; }, 1500);
+    });
+}
+
+// ---- Generic copy / toggle helpers for guide modal ----
+function copyEl(elId) {
+    const el = document.getElementById(elId);
+    navigator.clipboard.writeText(el.value).then(() => {
+        // flash feedback handled inline
+    });
+}
+
+function toggleEl(inputId, eyeId) {
+    const input = document.getElementById(inputId);
+    const eye   = document.getElementById(eyeId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        eye.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        eye.className = 'bi bi-eye';
+    }
+}
+
+// ---- Edit device buttons ----
+document.querySelectorAll('.btn-edit-device').forEach(function(btn) {
+    btn.addEventListener('click', function() { editDevice(this); });
+});
+
+// ---- Delete device buttons ----
+document.querySelectorAll('.btn-delete-device').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteDevice(this.getAttribute('data-id')); });
+});
+
+// ---- Edit device form submit ----
+var editForm = document.getElementById('editDeviceForm');
+if (editForm) {
+    editForm.addEventListener('submit', function(e) { submitEditDevice(e); });
+}
+
+// ---- Regenerate secret ----
+document.querySelectorAll('.btn-regen-secret').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const id   = this.getAttribute('data-id');
+        const name = this.getAttribute('data-name');
+        if (!confirm(`Regenerate API Key for "${name}"?\n\nThe old key will stop working immediately.`)) return;
+
+        fetch(`/admin/devices/${id}/regenerate-secret`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the displayed secret in the row
+                    const secretInput = document.getElementById('secret-' + id);
+                    if (secretInput) {
+                        secretInput.value = data.secret;
+                        secretInput.type  = 'text'; // show it once
+                        document.getElementById('eye-' + id).className = 'bi bi-eye-slash';
+                        setTimeout(() => {
+                            if (secretInput) secretInput.type = 'password';
+                            const eye = document.getElementById('eye-' + id);
+                            if (eye) eye.className = 'bi bi-eye';
+                        }, 8000);
+                    } else {
+                        // If row didn't have an input yet (was null), reload
+                        location.reload();
+                    }
+                    alert(`New API Key for "${name}" has been generated!\n\nIt is now visible in the row for 8 seconds. Copy it immediately.`);
+                } else {
+                    alert('Failed to regenerate secret: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(() => alert('Network error while regenerating secret'));
+    });
+});
+
+// ---- GitHub Actions Guide Modal ----
+document.querySelectorAll('.btn-guide-device').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const deviceName = this.getAttribute('data-name');
+        const secret     = this.getAttribute('data-secret');
+
+        document.getElementById('guide-device-name').textContent = deviceName;
+        document.getElementById('guide-api-key').value = secret || '(no secret yet — please regenerate)';
+
+        // Detect server base URL (works both on local and production)
+        const baseUrl = window.location.origin;
+        document.getElementById('guide-upload-url').value = baseUrl + '/api/upload';
+
+        // Build the YAML workflow content
+        const yaml = `name: OTA Firmware Upload
+
+# Trigger: push to main/master, or manually via workflow_dispatch
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '**.bin'          # adjust to your firmware output path
+  workflow_dispatch:
+    inputs:
+      set_active:
+        description: 'Activate firmware immediately after upload?'
+        required: false
+        default: 'false'
+
+jobs:
+  upload-firmware:
+    name: Upload to OTA Server
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. (Optional) Build your firmware here, e.g. with PlatformIO
+      # - name: Build Firmware
+      #   run: pio run
+
+      # 3. Determine version (reads from version.txt, tag, or env)
+      - name: Get Version
+        id: version
+        run: |
+          # Option A: read from file
+          echo "version=$(cat version.txt)" >> "$GITHUB_OUTPUT"
+          # Option B: use git tag
+          # echo "version=\${GITHUB_REF_NAME}" >> "\$GITHUB_OUTPUT"
+
+      # 4. Compute SHA-256 checksum
+      - name: Compute Checksum
+        id: checksum
+        run: |
+          FIRMWARE=".pio/build/${deviceName}/firmware.bin"   # ← adjust path
+          echo "checksum=$(sha256sum \$FIRMWARE | awk '{print \$1}')" >> "\$GITHUB_OUTPUT"
+          echo "firmware=\$FIRMWARE" >> "\$GITHUB_OUTPUT"
+
+      # 5. Upload firmware to OTA server
+      - name: Upload Firmware
+        env:
+          OTA_UPLOAD_URL: \${{ secrets.OTA_UPLOAD_URL }}
+          OTA_API_KEY:    \${{ secrets.OTA_API_KEY }}
+        run: |
+          FIRMWARE=".pio/build/${deviceName}/firmware.bin"   # ← adjust path
+          VERSION="\${{ steps.version.outputs.version }}"
+          CHECKSUM="\${{ steps.checksum.outputs.checksum }}"
+          SET_ACTIVE="\${{ github.event.inputs.set_active || 'false' }}"
+
+          curl -fsS -X POST "\$OTA_UPLOAD_URL" \\
+               -F "firmware=@\$FIRMWARE" \\
+               -F "version=\$VERSION" \\
+               -F "device_type=${deviceName}" \\
+               -F "checksum=\$CHECKSUM" \\
+               -F "uploaded_by=github-actions" \\
+               -F "source_repo=\${{ github.repository }}" \\
+               -F "set_active=\$SET_ACTIVE" \\
+               -H "x-api-key: \$OTA_API_KEY"
+
+          echo "✅ Firmware v\$VERSION uploaded successfully for device: ${deviceName}"
+`;
+        document.getElementById('guide-yaml').value = yaml;
+
+        var modal = new bootstrap.Modal(document.getElementById('guideModal'));
+        modal.show();
+    });
+});
 </script>
 
 <%- include('partials/footer') %>
