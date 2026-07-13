@@ -10,10 +10,11 @@ SET time_zone = '+00:00';
 -- Table: device_types
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS device_types (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    type_name   VARCHAR(50)  NOT NULL UNIQUE,
-    description TEXT,
-    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    type_name      VARCHAR(50)  NOT NULL UNIQUE,
+    description    TEXT,
+    webhook_secret VARCHAR(64)  DEFAULT NULL COMMENT 'Per-device API key for GitHub Actions upload',
+    created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS firmwares (
     file_size      INT,
     notes          TEXT,
     uploaded_by    VARCHAR(100) DEFAULT NULL,
+    source_repo    VARCHAR(255) DEFAULT NULL,
     created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_firmware_device_type
         FOREIGN KEY (device_type_id)
@@ -44,6 +46,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
     id            INT AUTO_INCREMENT PRIMARY KEY,
     username      VARCHAR(50)  NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    permissions   JSON         NOT NULL DEFAULT ('{"upload":true,"activate":true,"remove":true,"edit_detail":true,"edit_user":false}'),
     created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -62,6 +65,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
+-- Grant privileges for ota_user from any host (for Adminer)
+GRANT ALL PRIVILEGES ON ota_firmware_db.* TO 'ota_user'@'%' IDENTIFIED BY 'ota_password_app';
+FLUSH PRIVILEGES;
+
 -- Seed: Default admin user
 -- Username : admin
 -- Password : admin123  (bcrypt cost=10)

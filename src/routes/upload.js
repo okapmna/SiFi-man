@@ -36,8 +36,8 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
         return res.status(400).json({ status: 'error', message: 'No file uploaded' });
     }
 
-    const { version, device_type, release_notes, uploaded_by } = req.body;
-    console.log(`Received upload request: device=${device_type}, version=${version}, uploaded_by=${uploaded_by || 'unknown'}`);
+    const { version, device_type, release_notes, uploaded_by, checksum: providedChecksum, source_repo } = req.body;
+    console.log(`Received upload request: device=${device_type}, version=${version}, uploaded_by=${uploaded_by || 'unknown'}, source_repo=${source_repo || 'none'}`);
     
     if (!version || !device_type) {
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -75,17 +75,23 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
         fs.renameSync(req.file.path, finalPath);
         console.log(`File moved to: ${finalPath}`);
 
-        // Calculate checksum and file size
+        // Calculate checksum (SHA256) and file size
         const fileBuffer = fs.readFileSync(finalPath);
-        const hashSum = crypto.createHash('md5');
-        hashSum.update(fileBuffer);
-        const checksum = hashSum.digest('hex');
         const fileSize = fileBuffer.length;
+        const computedChecksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+        if (providedChecksum && computedChecksum !== providedChecksum) {
+            if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+            return res.status(400).json({
+                status: 'error',
+                message: `SHA256 checksum mismatch. Provided: ${providedChecksum}, Computed: ${computedChecksum}`
+            });
+        }
 
         // 2. Insert into firmwares table using device_type_id
         await conn.query(
-            "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, release_notes || null, uploaded_by || 'api_key']
+            "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, uploaded_by, source_repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [version, deviceTypeId, finalFilename, finalPath, computedChecksum, fileSize, release_notes || null, uploaded_by || 'api_key', source_repo || null]
         );
 
         await addLog({
@@ -104,9 +110,10 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
                 device_type: trustedName,
                 device_type_id: deviceTypeId,
                 filename: finalFilename,
-                checksum,
+                checksum: computedChecksum,
                 uploaded_by: uploaded_by || 'api_key',
                 release_notes: release_notes || null,
+                source_repo: source_repo || null,
                 storage_path: finalPath
             }
         });

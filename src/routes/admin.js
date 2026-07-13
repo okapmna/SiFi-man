@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const sessionAuth = require('../middleware/sessionAuth');
+const permissionCheck = require('../middleware/permissionCheck');
 const { addLog, getLogs } = require('../middleware/auditLog');
 
 // Helper: robust is_active conversion (handles boolean, number, string, Buffer)
@@ -70,6 +71,7 @@ router.post('/login', loginLimiter, async (req, res) => {
             if (isMatch) {
                 req.session.adminId = admin.id;
                 req.session.username = admin.username;
+                req.session.permissions = typeof admin.permissions === 'string' ? JSON.parse(admin.permissions) : (admin.permissions || {});
                 await addLog({ action: 'login', details: 'Login successful', ip_address: req.ip, performed_by: username });
                 return res.redirect('/admin/dashboard');
             }
@@ -120,14 +122,25 @@ router.get('/settings', async (req, res) => {
 
     let conn;
     let adminInfo = null;
+    let allUsers = [];
     try {
         conn = await pool.getConnection();
         const rows = await conn.query(
-            'SELECT id, username, created_at FROM admin_users WHERE id = ?',
+            'SELECT id, username, created_at, permissions FROM admin_users WHERE id = ?',
             [req.session.adminId]
         );
         if (rows.length > 0) {
             adminInfo = rows[0];
+            adminInfo.permissions = typeof adminInfo.permissions === 'string' ? JSON.parse(adminInfo.permissions) : (adminInfo.permissions || {});
+            req.session.permissions = adminInfo.permissions;
+        }
+
+        if (req.session.permissions && req.session.permissions.edit_user) {
+            const usersRows = await conn.query('SELECT id, username, permissions, created_at FROM admin_users ORDER BY id ASC');
+            allUsers = usersRows.map(u => ({
+                ...u,
+                permissions: typeof u.permissions === 'string' ? JSON.parse(u.permissions) : (u.permissions || {})
+            }));
         }
     } catch (err) {
         console.error('Settings error:', err);
@@ -139,9 +152,118 @@ router.get('/settings', async (req, res) => {
         username: req.session.username,
         activePage: 'settings',
         adminInfo,
+        allUsers,
+        permissions: req.session.permissions || {},
         success,
         error
     });
+});
+
+// ==========================================
+// USER MANAGER API
+// ==========================================
+
+// Add User
+router.post('/settings/users', permissionCheck('edit_user'), async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ success: false, error: 'Username and password required' });
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const existing = await conn.query('SELECT id FROM admin_users WHERE username = ?', [username]);
+        if (existing.length > 0) return res.status(400).json({ success: false, error: 'Username already exists' });
+
+        const hash = await bcrypt.hash(password, 10);
+        const defaultPerms = JSON.stringify({ upload: true, activate: true, remove: true, edit_detail: true, edit_user: false });
+        
+        await conn.query('INSERT INTO admin_users (username, password_hash, permissions) VALUES (?, ?, ?)', [username, hash, defaultPerms]);
+        await addLog({ action: 'create_user', details: `Created user ${username}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Add user error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// Edit Username
+router.put('/settings/users/:id/username', permissionCheck('edit_user'), async (req, res) => {
+    const { id } = req.params;
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ success: false, error: 'Username required' });
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const existing = await conn.query('SELECT id FROM admin_users WHERE username = ? AND id != ?', [username, id]);
+        if (existing.length > 0) return res.status(400).json({ success: false, error: 'Username already taken' });
+
+        await conn.query('UPDATE admin_users SET username = ? WHERE id = ?', [username, id]);
+        await addLog({ action: 'update_user', details: `Updated username for user ID ${id} to ${username}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Update username error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// Edit Permissions
+router.put('/settings/users/:id/permissions', permissionCheck('edit_user'), async (req, res) => {
+    const { id } = req.params;
+    const { permissions } = req.body;
+    
+    // Prevent self-editing permissions
+    if (Number(id) === Number(req.session.adminId)) {
+        return res.status(403).json({ success: false, error: 'You cannot edit your own permissions' });
+    }
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        await conn.query('UPDATE admin_users SET permissions = ? WHERE id = ?', [JSON.stringify(permissions), id]);
+        await addLog({ action: 'update_permissions', details: `Updated permissions for user ID ${id}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Update permissions error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// Delete User
+router.delete('/settings/users/:id', permissionCheck('edit_user'), async (req, res) => {
+    const { id } = req.params;
+
+    // Prevent self-deletion
+    if (Number(id) === Number(req.session.adminId)) {
+        return res.status(403).json({ success: false, error: 'You cannot delete yourself' });
+    }
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        
+        const user = await conn.query('SELECT username FROM admin_users WHERE id = ?', [id]);
+        if (user.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+        
+        await conn.query('DELETE FROM admin_users WHERE id = ?', [id]);
+        await addLog({ action: 'delete_user', details: `Deleted user ${user[0].username}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Delete user error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
 });
 
 // POST /admin/settings/password - Proses ganti password
@@ -252,13 +374,12 @@ router.get('/devices', async (req, res) => {
     try {
         conn = await pool.getConnection();
         const devices = await conn.query(`
-            SELECT dt.id, dt.type_name, dt.description, dt.created_at,
+            SELECT dt.id, dt.type_name, dt.description, dt.webhook_secret, dt.created_at,
                    (SELECT COUNT(*) FROM firmwares f WHERE f.device_type_id = dt.id) as firmware_count
             FROM device_types dt
             ORDER BY dt.created_at DESC
         `);
         
-        // Helper untuk parse BigInt jika perlu, walau di view bisa langsung toString
         const formattedDevices = devices.map(d => ({
             ...d,
             firmware_count: Number(d.firmware_count)
@@ -282,17 +403,40 @@ router.post('/devices', async (req, res) => {
     let conn;
     try {
         const { type_name, description } = req.body;
+        // Auto-generate a unique webhook_secret for every new device
+        const webhookSecret = crypto.randomBytes(32).toString('hex');
         conn = await pool.getConnection();
         const result = await conn.query(
-            "INSERT INTO device_types (type_name, description) VALUES (?, ?)",
-            [type_name, description]
+            "INSERT INTO device_types (type_name, description, webhook_secret) VALUES (?, ?, ?)",
+            [type_name, description, webhookSecret]
         );
         await addLog({ action: 'device_created', entity_type: 'device_type', entity_id: Number(result.insertId), details: `Created device type: ${type_name}`, performed_by: req.session.username, ip_address: req.ip });
         res.redirect('/admin/devices');
     } catch (error) {
         console.error('Add device error:', error);
-        // Handle constraint errors properly in a real app, here we just return error text
         res.status(500).send('Failed to add device. Maybe duplicate name?');
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// POST /admin/devices/:id/regenerate-secret — regenerate webhook secret
+router.post('/devices/:id/regenerate-secret', async (req, res) => {
+    let conn;
+    try {
+        const deviceId = req.params.id;
+        const newSecret = crypto.randomBytes(32).toString('hex');
+        conn = await pool.getConnection();
+        const rows = await conn.query('SELECT type_name FROM device_types WHERE id = ?', [deviceId]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Device not found' });
+        }
+        await conn.query('UPDATE device_types SET webhook_secret = ? WHERE id = ?', [newSecret, deviceId]);
+        await addLog({ action: 'device_secret_regenerated', entity_type: 'device_type', entity_id: Number(deviceId), details: `Regenerated webhook secret for: ${rows[0].type_name}`, performed_by: req.session.username, ip_address: req.ip });
+        res.json({ success: true, secret: newSecret });
+    } catch (error) {
+        console.error('Regenerate secret error:', error);
+        res.status(500).json({ error: 'Failed to regenerate secret' });
     } finally {
         if (conn) conn.release();
     }
@@ -357,7 +501,8 @@ router.get('/firmwares', async (req, res) => {
 
         let query = `
             SELECT f.id, f.version, f.filename, f.file_path, f.file_size, f.checksum,
-                   f.is_active, f.notes, f.uploaded_by, f.created_at, dt.type_name, dt.id as device_type_id
+                   f.is_active, f.notes, f.uploaded_by, f.source_repo, f.created_at,
+                   dt.type_name, dt.id as device_type_id
             FROM firmwares f
             JOIN device_types dt ON f.device_type_id = dt.id
         `;
@@ -508,7 +653,7 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         return res.redirect('/admin/upload?error=No+file+uploaded');
     }
 
-    const { version, device_type, notes, set_active } = req.body;
+    const { version, device_type, notes, set_active, source_repo } = req.body;
 
     if (!version || !device_type) {
         if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -539,9 +684,9 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         // Move file from temp to final destination
         fs.renameSync(req.file.path, finalPath);
 
-        // Calculate checksum and file size
+        // Calculate SHA256 checksum and file size
         const fileBuffer = fs.readFileSync(finalPath);
-        const checksum = crypto.createHash('md5').update(fileBuffer).digest('hex');
+        const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
         const fileSize = fileBuffer.length;
 
         const isActive = set_active === 'on' || set_active === '1' || set_active === 'true';
@@ -552,8 +697,8 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         }
 
         await conn.query(
-            'INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, is_active, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive, req.session.username]
+            'INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, is_active, uploaded_by, source_repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive, req.session.username, source_repo || null]
         );
 
         await addLog({ action: isActive ? 'firmware_uploaded_active' : 'firmware_uploaded', entity_type: 'firmware', details: `Uploaded firmware ${version} for ${trustedName} (${finalFilename})`, performed_by: req.session.username, ip_address: req.ip });
