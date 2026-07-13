@@ -170,49 +170,46 @@
 <!-- ===================================================
      GitHub Actions Guide Modal
      =================================================== -->
-<div class="modal fade modal-xl" id="guideModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<div class="modal fade" id="guideModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg,#1a1a2e,#16213e); color:#fff;">
+            <div class="modal-header">
                 <h5 class="modal-title">
                     <i class="bi bi-github me-2"></i>
-                    GitHub Actions Guide — <span id="guide-device-name" class="text-warning fw-bold"></span>
+                    GitHub Actions Setup
+                    <span class="badge bg-primary ms-2 fw-normal" id="guide-device-name"></span>
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4">
-
-                <!-- Step 1 -->
-                <h6 class="fw-bold mb-2"><span class="badge bg-primary me-2">1</span>Set GitHub Repository Secrets</h6>
-                <p class="text-muted small mb-2">
-                    Go to your GitHub repo → <strong>Settings → Secrets and variables → Actions → New repository secret</strong>.
-                    You only need to add <strong>2 secrets</strong>:
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Add these <strong>2 secrets</strong> to your GitHub repository under
+                    <strong>Settings → Secrets and variables → Actions</strong>.
+                    Then include <code>device_type</code> and <code>checksum</code> as required fields in your workflow.
                 </p>
-                <table class="table table-sm table-bordered mb-3">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Secret Name</th>
-                            <th>Value</th>
-                            <th></th>
-                        </tr>
-                    </thead>
+
+                <table class="table table-bordered mb-3">
                     <tbody>
                         <tr>
-                            <td><code>OTA_UPLOAD_URL</code></td>
+                            <th style="width:160px;" class="text-nowrap align-middle">Secret name</th>
+                            <th class="align-middle">Value</th>
+                            <th style="width:44px;"></th>
+                        </tr>
+                        <tr>
+                            <td class="align-middle"><code>OTA_UPLOAD_URL</code></td>
                             <td>
-                                <input type="text" class="form-control form-control-sm" id="guide-upload-url"
-                                       placeholder="https://your-server/api/upload" value="">
+                                <input type="text" class="form-control form-control-sm" id="guide-upload-url" readonly>
                             </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="copyEl('guide-upload-url')" title="Copy">
+                            <td class="align-middle text-center">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="copyGuideEl('guide-upload-url', this)" title="Copy">
                                     <i class="bi bi-clipboard"></i>
                                 </button>
                             </td>
                         </tr>
                         <tr>
-                            <td>
+                            <td class="align-middle">
                                 <code>OTA_API_KEY</code>
-                                <span class="d-block text-muted" style="font-size:0.7rem">(or OTA_WEBHOOK_SECRET)</span>
+                                <small class="d-block text-muted">(or OTA_WEBHOOK_SECRET)</small>
                             </td>
                             <td>
                                 <div class="input-group input-group-sm">
@@ -224,44 +221,43 @@
                                     </button>
                                 </div>
                             </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="copyEl('guide-api-key')" title="Copy">
+                            <td class="align-middle text-center">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="copyGuideEl('guide-api-key', this)" title="Copy">
                                     <i class="bi bi-clipboard"></i>
                                 </button>
                             </td>
                         </tr>
                     </tbody>
                 </table>
-                <div class="alert alert-warning py-2 small mb-3">
-                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                    <strong>Required in your workflow</strong> (not stored as secrets):
-                    <code>device_type</code> and <code>checksum</code> must be included in every upload — see step 2.
-                </div>
 
-                <!-- Step 2 -->
-                <h6 class="fw-bold mb-2"><span class="badge bg-primary me-2">2</span>Add Workflow File to Your Repo</h6>
-                <p class="text-muted small mb-2">
-                    Create <code>.github/workflows/ota-upload.yml</code> in your firmware repository with the content below.
-                    Adjust <code>FIRMWARE</code> path and <code>VERSION</code> source to match your project.
-                </p>
-
-                <div class="position-relative">
-                    <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-2"
-                            onclick="copyEl('guide-yaml')" title="Copy YAML">
-                        <i class="bi bi-clipboard"></i> Copy
-                    </button>
-                    <textarea id="guide-yaml" class="form-control font-monospace small" rows="48" readonly
-                              style="background:#1e1e2e; color:#cdd6f4; border:none; resize:none; font-size:0.78rem;"></textarea>
-                </div>
-
-                <!-- Step 3 -->
-                <h6 class="fw-bold mt-3 mb-2"><span class="badge bg-primary me-2">3</span>Activate Firmware After Upload</h6>
-                <p class="text-muted small mb-0">
-                    After upload, the firmware will be listed in the <strong>Firmwares</strong> page with status <em>Inactive</em>.
-                    Click <strong>Activate</strong> in the dashboard to make ESP32 devices receive this update.
-                    <br>Or add <code>-F "set_active=true"</code> to the curl command to auto-activate on upload.
-                </p>
-
+                <table class="table table-bordered mb-0">
+                    <tbody>
+                        <tr>
+                            <th colspan="3" class="table-light small text-muted">
+                                <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>
+                                Required fields in your workflow <em>(hardcode in the yml, not secrets)</em>
+                            </th>
+                        </tr>
+                        <tr>
+                            <th style="width:160px;" class="align-middle"><code>device_type</code></th>
+                            <td class="align-middle">
+                                <input type="text" class="form-control form-control-sm font-monospace" id="guide-device-type" readonly>
+                            </td>
+                            <td style="width:44px;" class="align-middle text-center">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="copyGuideEl('guide-device-type', this)" title="Copy">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th class="align-middle"><code>checksum</code></th>
+                            <td class="align-middle text-muted small fst-italic" colspan="2">
+                                SHA-256 of the firmware binary — compute in the workflow:
+                                <code class="d-block mt-1">sha256sum firmware.bin | awk '{print $1}'</code>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -294,10 +290,14 @@ function copySecret(id) {
 }
 
 // ---- Generic copy / toggle helpers for guide modal ----
-function copyEl(elId) {
+function copyGuideEl(elId, btn) {
     const el = document.getElementById(elId);
     navigator.clipboard.writeText(el.value).then(() => {
-        // flash feedback handled inline
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.className = 'bi bi-check2';
+            setTimeout(() => { icon.className = 'bi bi-clipboard'; }, 1500);
+        }
     });
 }
 
@@ -340,11 +340,10 @@ document.querySelectorAll('.btn-regen-secret').forEach(function(btn) {
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    // Update the displayed secret in the row
                     const secretInput = document.getElementById('secret-' + id);
                     if (secretInput) {
                         secretInput.value = data.secret;
-                        secretInput.type  = 'text'; // show it once
+                        secretInput.type  = 'text';
                         document.getElementById('eye-' + id).className = 'bi bi-eye-slash';
                         setTimeout(() => {
                             if (secretInput) secretInput.type = 'password';
@@ -352,7 +351,6 @@ document.querySelectorAll('.btn-regen-secret').forEach(function(btn) {
                             if (eye) eye.className = 'bi bi-eye';
                         }, 8000);
                     } else {
-                        // If row didn't have an input yet (was null), reload
                         location.reload();
                     }
                     alert(`New API Key for "${name}" has been generated!\n\nIt is now visible in the row for 8 seconds. Copy it immediately.`);
@@ -370,76 +368,18 @@ document.querySelectorAll('.btn-guide-device').forEach(function(btn) {
         const deviceName = this.getAttribute('data-name');
         const secret     = this.getAttribute('data-secret');
 
-        document.getElementById('guide-device-name').textContent = deviceName;
-        document.getElementById('guide-api-key').value = secret || '(no secret yet — please regenerate)';
+        document.getElementById('guide-device-name').textContent  = deviceName;
+        document.getElementById('guide-api-key').value            = secret || '(no secret — please regenerate)';
+        document.getElementById('guide-device-type').value        = deviceName;
+        document.getElementById('guide-upload-url').value         = window.location.origin + '/api/upload';
 
-        // Detect server base URL (works both on local and production)
-        const baseUrl = window.location.origin;
-        document.getElementById('guide-upload-url').value = baseUrl + '/api/upload';
+        // reset eye icon
+        const eye = document.getElementById('guide-eye');
+        if (eye) eye.className = 'bi bi-eye';
+        const apiKeyInput = document.getElementById('guide-api-key');
+        if (apiKeyInput) apiKeyInput.type = 'password';
 
-        // Build the YAML workflow content
-        const yaml = `name: OTA Firmware Upload
-
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
-jobs:
-  upload-firmware:
-    name: Upload to OTA Server
-    runs-on: ubuntu-latest
-
-    env:
-      # ── GitHub Secrets (set these in your repo Settings → Secrets) ──
-      OTA_UPLOAD_URL: \${{ secrets.OTA_UPLOAD_URL }}
-      OTA_API_KEY:    \${{ secrets.OTA_API_KEY }}
-
-      # ── REQUIRED: adjust these two values to match your project ──
-      DEVICE_TYPE: ${deviceName}         # must match the device name registered on the OTA server
-      FIRMWARE:    .pio/build/${deviceName}/firmware.bin  # path to your compiled .bin file
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # (Optional) Build firmware — uncomment if not pre-built
-      # - name: Build Firmware
-      #   run: pio run
-
-      - name: Get Version
-        id: version
-        run: |
-          # Read version from file — adjust as needed
-          echo "version=\$(cat version.txt)" >> "\$GITHUB_OUTPUT"
-          # Or use git tag:
-          # echo "version=\${GITHUB_REF_NAME}" >> "\$GITHUB_OUTPUT"
-
-      # REQUIRED: compute SHA-256 checksum before upload
-      - name: Compute SHA-256 Checksum
-        id: checksum
-        run: |
-          echo "value=\$(sha256sum \$FIRMWARE | awk '{print \$1}')" >> "\$GITHUB_OUTPUT"
-
-      - name: Upload Firmware to OTA Server
-        run: |
-          VERSION="\${{ steps.version.outputs.version }}"
-          CHECKSUM="\${{ steps.checksum.outputs.value }}"
-
-          # REQUIRED fields: firmware file, version, device_type, checksum, x-api-key
-          curl -fsS -X POST "\$OTA_UPLOAD_URL" \\
-               -F "firmware=@\$FIRMWARE" \\
-               -F "version=\$VERSION" \\
-               -F "device_type=\$DEVICE_TYPE" \\
-               -F "checksum=\$CHECKSUM" \\
-               -H "x-api-key: \$OTA_API_KEY"
-
-          echo "✅ Firmware v\$VERSION uploaded for device: \$DEVICE_TYPE"
-`;
-        document.getElementById('guide-yaml').value = yaml;
-
-        var modal = new bootstrap.Modal(document.getElementById('guideModal'));
-        modal.show();
+        new bootstrap.Modal(document.getElementById('guideModal')).show();
     });
 });
 </script>
