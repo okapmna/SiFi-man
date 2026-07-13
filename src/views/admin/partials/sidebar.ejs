@@ -1,36 +1,42 @@
 <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
     <div class="sidebar-brand">
-        <h5><i class="bi bi-cpu-fill me-1"></i> SiFi-man</h5>
+        <h5 style="font-size:2rem; font-weight:bold;">SiFi-man</h5>
         <small class="text-muted" style="font-size:0.65rem; letter-spacing:.05em;">OTA Firmware Manager</small>
     </div>
     <ul class="nav flex-column mb-auto">
         <li class="nav-item">
-            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>" href="/admin/dashboard">
+            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'dashboard' ? 'active' : '' %>"
+                href="/admin/dashboard">
                 <i class="bi bi-speedometer2"></i> Dashboard
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'devices' ? 'active' : '' %>" href="/admin/devices">
+            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'devices' ? 'active' : '' %>"
+                href="/admin/devices">
                 <i class="bi bi-cpu"></i> Devices
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'firmwares' ? 'active' : '' %>" href="/admin/firmwares">
+            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'firmwares' ? 'active' : '' %>"
+                href="/admin/firmwares">
                 <i class="bi bi-box-seam"></i> Firmwares
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'upload' ? 'active' : '' %>" href="/admin/upload">
+            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'upload' ? 'active' : '' %>"
+                href="/admin/upload">
                 <i class="bi bi-cloud-arrow-up"></i> Upload
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'logs' ? 'active' : '' %>" href="/admin/logs">
+            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'logs' ? 'active' : '' %>"
+                href="/admin/logs">
                 <i class="bi bi-journal-text"></i> Logs
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'settings' ? 'active' : '' %>" href="/admin/settings">
+            <a class="nav-link <%= typeof activePage !== 'undefined' && activePage === 'settings' ? 'active' : '' %>"
+                href="/admin/settings">
                 <i class="bi bi-gear"></i> Settings
             </a>
         </li>
@@ -38,12 +44,12 @@
     <div class="sidebar-footer">
         <div class="user-info">
             <i class="bi bi-person-circle"></i>
-            <span><%= typeof username !== 'undefined' ? username : 'Admin' %></span>
+            <span>
+                <%= typeof username !=='undefined' ? username : 'Admin' %>
+            </span>
         </div>
-        <form action="/admin/logout" method="POST">
-            <button type="submit" class="btn btn-outline-danger btn-sm w-100">
-                <i class="bi bi-box-arrow-right"></i> Logout
-            </button>
-        </form>
+        <a href="/admin/settings" class="btn btn-outline-secondary btn-sm w-100 mt-2">
+            <i class="bi bi-gear"></i> Account Settings
+        </a>
     </div>
 </nav>

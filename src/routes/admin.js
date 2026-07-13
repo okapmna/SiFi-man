@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const sessionAuth = require('../middleware/sessionAuth');
+const permissionCheck = require('../middleware/permissionCheck');
 const { addLog, getLogs } = require('../middleware/auditLog');
 
 // Helper: robust is_active conversion (handles boolean, number, string, Buffer)
@@ -70,6 +71,7 @@ router.post('/login', loginLimiter, async (req, res) => {
             if (isMatch) {
                 req.session.adminId = admin.id;
                 req.session.username = admin.username;
+                req.session.permissions = typeof admin.permissions === 'string' ? JSON.parse(admin.permissions) : (admin.permissions || {});
                 await addLog({ action: 'login', details: 'Login successful', ip_address: req.ip, performed_by: username });
                 return res.redirect('/admin/dashboard');
             }
@@ -120,14 +122,25 @@ router.get('/settings', async (req, res) => {
 
     let conn;
     let adminInfo = null;
+    let allUsers = [];
     try {
         conn = await pool.getConnection();
         const rows = await conn.query(
-            'SELECT id, username, created_at FROM admin_users WHERE id = ?',
+            'SELECT id, username, created_at, permissions FROM admin_users WHERE id = ?',
             [req.session.adminId]
         );
         if (rows.length > 0) {
             adminInfo = rows[0];
+            adminInfo.permissions = typeof adminInfo.permissions === 'string' ? JSON.parse(adminInfo.permissions) : (adminInfo.permissions || {});
+            req.session.permissions = adminInfo.permissions;
+        }
+
+        if (req.session.permissions && req.session.permissions.edit_user) {
+            const usersRows = await conn.query('SELECT id, username, permissions, created_at FROM admin_users ORDER BY id ASC');
+            allUsers = usersRows.map(u => ({
+                ...u,
+                permissions: typeof u.permissions === 'string' ? JSON.parse(u.permissions) : (u.permissions || {})
+            }));
         }
     } catch (err) {
         console.error('Settings error:', err);
@@ -139,9 +152,118 @@ router.get('/settings', async (req, res) => {
         username: req.session.username,
         activePage: 'settings',
         adminInfo,
+        allUsers,
+        permissions: req.session.permissions || {},
         success,
         error
     });
+});
+
+// ==========================================
+// USER MANAGER API
+// ==========================================
+
+// Add User
+router.post('/settings/users', permissionCheck('edit_user'), async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ success: false, error: 'Username and password required' });
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const existing = await conn.query('SELECT id FROM admin_users WHERE username = ?', [username]);
+        if (existing.length > 0) return res.status(400).json({ success: false, error: 'Username already exists' });
+
+        const hash = await bcrypt.hash(password, 10);
+        const defaultPerms = JSON.stringify({ upload: true, activate: true, remove: true, edit_detail: true, edit_user: false });
+        
+        await conn.query('INSERT INTO admin_users (username, password_hash, permissions) VALUES (?, ?, ?)', [username, hash, defaultPerms]);
+        await addLog({ action: 'create_user', details: `Created user ${username}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Add user error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// Edit Username
+router.put('/settings/users/:id/username', permissionCheck('edit_user'), async (req, res) => {
+    const { id } = req.params;
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ success: false, error: 'Username required' });
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const existing = await conn.query('SELECT id FROM admin_users WHERE username = ? AND id != ?', [username, id]);
+        if (existing.length > 0) return res.status(400).json({ success: false, error: 'Username already taken' });
+
+        await conn.query('UPDATE admin_users SET username = ? WHERE id = ?', [username, id]);
+        await addLog({ action: 'update_user', details: `Updated username for user ID ${id} to ${username}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Update username error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// Edit Permissions
+router.put('/settings/users/:id/permissions', permissionCheck('edit_user'), async (req, res) => {
+    const { id } = req.params;
+    const { permissions } = req.body;
+    
+    // Prevent self-editing permissions
+    if (Number(id) === Number(req.session.adminId)) {
+        return res.status(403).json({ success: false, error: 'You cannot edit your own permissions' });
+    }
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        await conn.query('UPDATE admin_users SET permissions = ? WHERE id = ?', [JSON.stringify(permissions), id]);
+        await addLog({ action: 'update_permissions', details: `Updated permissions for user ID ${id}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Update permissions error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// Delete User
+router.delete('/settings/users/:id', permissionCheck('edit_user'), async (req, res) => {
+    const { id } = req.params;
+
+    // Prevent self-deletion
+    if (Number(id) === Number(req.session.adminId)) {
+        return res.status(403).json({ success: false, error: 'You cannot delete yourself' });
+    }
+
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        
+        const user = await conn.query('SELECT username FROM admin_users WHERE id = ?', [id]);
+        if (user.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+        
+        await conn.query('DELETE FROM admin_users WHERE id = ?', [id]);
+        await addLog({ action: 'delete_user', details: `Deleted user ${user[0].username}`, ip_address: req.ip, performed_by: req.session.username });
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Delete user error:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    } finally {
+        if (conn) conn.release();
+    }
 });
 
 // POST /admin/settings/password - Proses ganti password
