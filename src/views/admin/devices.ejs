@@ -185,8 +185,8 @@
                 <!-- Step 1 -->
                 <h6 class="fw-bold mb-2"><span class="badge bg-primary me-2">1</span>Set GitHub Repository Secrets</h6>
                 <p class="text-muted small mb-2">
-                    Go to your GitHub repo → <strong>Settings → Secrets and variables → Actions → New repository secret</strong>,
-                    then add the following secrets:
+                    Go to your GitHub repo → <strong>Settings → Secrets and variables → Actions → New repository secret</strong>.
+                    You only need to add <strong>2 secrets</strong>:
                 </p>
                 <table class="table table-sm table-bordered mb-3">
                     <thead class="table-dark">
@@ -210,7 +210,10 @@
                             </td>
                         </tr>
                         <tr>
-                            <td><code>OTA_API_KEY</code></td>
+                            <td>
+                                <code>OTA_API_KEY</code>
+                                <span class="d-block text-muted" style="font-size:0.7rem">(or OTA_WEBHOOK_SECRET)</span>
+                            </td>
                             <td>
                                 <div class="input-group input-group-sm">
                                     <input type="password" class="form-control form-control-sm font-monospace"
@@ -229,6 +232,11 @@
                         </tr>
                     </tbody>
                 </table>
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    <strong>Required in your workflow</strong> (not stored as secrets):
+                    <code>device_type</code> and <code>checksum</code> must be included in every upload — see step 2.
+                </div>
 
                 <!-- Step 2 -->
                 <h6 class="fw-bold mb-2"><span class="badge bg-primary me-2">2</span>Add Workflow File to Your Repo</h6>
@@ -372,72 +380,61 @@ document.querySelectorAll('.btn-guide-device').forEach(function(btn) {
         // Build the YAML workflow content
         const yaml = `name: OTA Firmware Upload
 
-# Trigger: push to main/master, or manually via workflow_dispatch
 on:
   push:
     branches: [ main, master ]
-    paths:
-      - '**.bin'          # adjust to your firmware output path
   workflow_dispatch:
-    inputs:
-      set_active:
-        description: 'Activate firmware immediately after upload?'
-        required: false
-        default: 'false'
 
 jobs:
   upload-firmware:
     name: Upload to OTA Server
     runs-on: ubuntu-latest
 
+    env:
+      # ── GitHub Secrets (set these in your repo Settings → Secrets) ──
+      OTA_UPLOAD_URL: \${{ secrets.OTA_UPLOAD_URL }}
+      OTA_API_KEY:    \${{ secrets.OTA_API_KEY }}
+
+      # ── REQUIRED: adjust these two values to match your project ──
+      DEVICE_TYPE: ${deviceName}         # must match the device name registered on the OTA server
+      FIRMWARE:    .pio/build/${deviceName}/firmware.bin  # path to your compiled .bin file
+
     steps:
-      # 1. Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. (Optional) Build your firmware here, e.g. with PlatformIO
+      # (Optional) Build firmware — uncomment if not pre-built
       # - name: Build Firmware
       #   run: pio run
 
-      # 3. Determine version (reads from version.txt, tag, or env)
       - name: Get Version
         id: version
         run: |
-          # Option A: read from file
-          echo "version=$(cat version.txt)" >> "$GITHUB_OUTPUT"
-          # Option B: use git tag
+          # Read version from file — adjust as needed
+          echo "version=\$(cat version.txt)" >> "\$GITHUB_OUTPUT"
+          # Or use git tag:
           # echo "version=\${GITHUB_REF_NAME}" >> "\$GITHUB_OUTPUT"
 
-      # 4. Compute SHA-256 checksum
-      - name: Compute Checksum
+      # REQUIRED: compute SHA-256 checksum before upload
+      - name: Compute SHA-256 Checksum
         id: checksum
         run: |
-          FIRMWARE=".pio/build/${deviceName}/firmware.bin"   # ← adjust path
-          echo "checksum=$(sha256sum \$FIRMWARE | awk '{print \$1}')" >> "\$GITHUB_OUTPUT"
-          echo "firmware=\$FIRMWARE" >> "\$GITHUB_OUTPUT"
+          echo "value=\$(sha256sum \$FIRMWARE | awk '{print \$1}')" >> "\$GITHUB_OUTPUT"
 
-      # 5. Upload firmware to OTA server
-      - name: Upload Firmware
-        env:
-          OTA_UPLOAD_URL: \${{ secrets.OTA_UPLOAD_URL }}
-          OTA_API_KEY:    \${{ secrets.OTA_API_KEY }}
+      - name: Upload Firmware to OTA Server
         run: |
-          FIRMWARE=".pio/build/${deviceName}/firmware.bin"   # ← adjust path
           VERSION="\${{ steps.version.outputs.version }}"
-          CHECKSUM="\${{ steps.checksum.outputs.checksum }}"
-          SET_ACTIVE="\${{ github.event.inputs.set_active || 'false' }}"
+          CHECKSUM="\${{ steps.checksum.outputs.value }}"
 
+          # REQUIRED fields: firmware file, version, device_type, checksum, x-api-key
           curl -fsS -X POST "\$OTA_UPLOAD_URL" \\
                -F "firmware=@\$FIRMWARE" \\
                -F "version=\$VERSION" \\
-               -F "device_type=${deviceName}" \\
+               -F "device_type=\$DEVICE_TYPE" \\
                -F "checksum=\$CHECKSUM" \\
-               -F "uploaded_by=github-actions" \\
-               -F "source_repo=\${{ github.repository }}" \\
-               -F "set_active=\$SET_ACTIVE" \\
                -H "x-api-key: \$OTA_API_KEY"
 
-          echo "✅ Firmware v\$VERSION uploaded successfully for device: ${deviceName}"
+          echo "✅ Firmware v\$VERSION uploaded for device: \$DEVICE_TYPE"
 `;
         document.getElementById('guide-yaml').value = yaml;
 
