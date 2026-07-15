@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
 const { getStorage } = require('../services/storage');
@@ -87,10 +88,18 @@ router.get('/download/:filename', downloadLimiter, async (req, res) => {
 
         const filePath = rows[0].file_path;
 
-        // Prioritaskan Supabase signed URL (CDN, lebih cepat)
+        // Prioritaskan Supabase signed URL — stream langsung (no redirect, biar ESP32 bisa)
         const signedUrl = await storage.getDownloadUrl(filePath);
         if (signedUrl) {
-            return res.redirect(signedUrl);
+            const response = await axios({
+                method: 'GET',
+                url: signedUrl,
+                responseType: 'stream'
+            });
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            response.data.pipe(res);
+            return;
         }
 
         // Fallback ke local filesystem
