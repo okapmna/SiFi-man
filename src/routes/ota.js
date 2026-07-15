@@ -46,7 +46,7 @@ router.get('/check', checkLimiter, async (req, res) => {
         `, [deviceType]);
 
         if (rows.length === 0) {
-            return res.status(404).json({ status: 'no_update', message: 'No firmware found for this device' });
+            return res.status(200).json({ status: 'no_update', message: 'No firmware found for this device' });
         }
 
         const latest = rows[0];
@@ -55,7 +55,7 @@ router.get('/check', checkLimiter, async (req, res) => {
             return res.json({
                 status: 'update_available',
                 version: latest.version,
-                url: `/api/ota/download/${latest.filename}`,
+                url: `/ota/download/${latest.filename}`,
                 checksum: latest.checksum
             });
         } else {
