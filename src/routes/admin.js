@@ -11,6 +11,7 @@ const sessionAuth = require('../middleware/sessionAuth');
 const permissionCheck = require('../middleware/permissionCheck');
 const { addLog, getLogs } = require('../middleware/auditLog');
 const { getStorage } = require('../services/storage');
+const supabase = require('../config/supabase');
 
 const storage = getStorage();
 
@@ -542,6 +543,7 @@ router.get('/firmwares', async (req, res) => {
             firmwares: enriched,
             deviceTypes,
             deviceFilter,
+            isSupabase: !!supabase,
             success: req.query.success || null,
             error: req.query.error || null
         });
@@ -575,6 +577,61 @@ router.patch('/firmwares/:id/activate', async (req, res) => {
     } catch (err) {
         console.error('Activate firmware error:', err);
         res.status(500).json({ error: 'Failed to activate firmware' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
+// POST /admin/firmwares/sync — sync local firmware files to Supabase
+router.post('/firmwares/sync', async (req, res) => {
+    if (!supabase) {
+        return res.status(400).json({ error: 'Supabase not configured' });
+    }
+
+    let conn;
+    const results = { success: [], skipped: [], failed: [] };
+    try {
+        conn = await pool.getConnection();
+        const firmwares = await conn.query(
+            'SELECT f.id, f.filename, f.file_path, f.version, dt.type_name FROM firmwares f JOIN device_types dt ON f.device_type_id = dt.id ORDER BY f.id'
+        );
+
+        for (const fw of firmwares) {
+            const storagePath = `${fw.type_name}/${fw.filename}`;
+
+            // Check if already in Supabase
+            const { data: existing } = await supabase.storage
+                .from(process.env.SUPABASE_BUCKET || 'firmwares')
+                .list(fw.type_name, { search: fw.filename });
+
+            if (existing && existing.length > 0) {
+                results.skipped.push(storagePath);
+                continue;
+            }
+
+            // Check local file
+            const localPath = fw.file_path;
+            if (!fs.existsSync(localPath)) {
+                results.failed.push({ path: storagePath, reason: 'File lokal tidak ditemukan' });
+                continue;
+            }
+
+            const fileBuffer = fs.readFileSync(localPath);
+            const { error } = await supabase.storage
+                .from(process.env.SUPABASE_BUCKET || 'firmwares')
+                .upload(storagePath, fileBuffer, { contentType: 'application/octet-stream', upsert: false });
+
+            if (error) {
+                results.failed.push({ path: storagePath, reason: error.message });
+            } else {
+                results.success.push(storagePath);
+            }
+        }
+
+        res.json(results);
+    } catch (err) {
+        console.error('Sync error:', err);
+        res.status(500).json({ error: 'Sync failed: ' + err.message });
     } finally {
         if (conn) conn.release();
     }

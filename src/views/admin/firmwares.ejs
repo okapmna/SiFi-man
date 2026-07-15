@@ -39,7 +39,12 @@
                         <i class="bi bi-x-circle"></i> Clear
                     </a>
                 <% } %>
-                <span class="ms-auto text-muted small">
+                <span class="ms-auto text-muted small d-flex align-items-center gap-2">
+                    <% if (isSupabase) { %>
+                        <button id="btnSyncSupabase" class="btn btn-sm btn-outline-info" title="Sync firmware ke Supabase Storage">
+                            <i class="bi bi-cloud-arrow-up"></i> Sync to Supabase
+                        </button>
+                    <% } %>
                     <span id="firmwareCount">–</span> firmware(s)
                 </span>
             </form>
@@ -139,6 +144,30 @@
         </div>
     </div>
 </main>
+
+<!-- Sync Result Modal -->
+<% if (isSupabase) { %>
+<div class="modal fade" id="syncResultModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Sync to Supabase</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="syncResultBody">
+                <div class="text-center py-4" id="syncLoading">
+                    <div class="spinner-border text-info mb-3" role="status"></div>
+                    <p class="mb-0">Syncing firmware ke Supabase Storage...</p>
+                </div>
+                <div id="syncResultContent" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
 
 <!-- Firmware Detail Modal -->
 <div class="modal fade" id="firmwareDetailModal" tabindex="-1" aria-hidden="true">
@@ -280,6 +309,60 @@
             deleteFirmware(this.getAttribute('data-id'), this);
         });
     });
+
+    // Sync to Supabase
+    var syncBtn = document.getElementById('btnSyncSupabase');
+    if (syncBtn) {
+        syncBtn.addEventListener('click', async function() {
+            var modal = new bootstrap.Modal(document.getElementById('syncResultModal'));
+            modal.show();
+
+            var loading = document.getElementById('syncLoading');
+            var content = document.getElementById('syncResultContent');
+            loading.style.display = 'block';
+            content.style.display = 'none';
+
+            try {
+                var res = await fetch('/admin/firmwares/sync', { method: 'POST' });
+                var data = await res.json();
+
+                loading.style.display = 'none';
+                content.style.display = 'block';
+
+                var html = '';
+                if (data.error) {
+                    html = '<div class="alert alert-danger">' + data.error + '</div>';
+                } else {
+                    html += '<div class="mb-3">';
+                    html += '<span class="badge bg-success me-1">' + data.success.length + ' synced</span>';
+                    html += '<span class="badge bg-secondary me-1">' + data.skipped.length + ' skipped</span>';
+                    html += '<span class="badge bg-danger">' + data.failed.length + ' failed</span>';
+                    html += '</div>';
+
+                    if (data.success.length > 0) {
+                        html += '<h6 class="text-success"><i class="bi bi-check-circle"></i> Synced</h6><ul class="small">';
+                        data.success.forEach(function(p) { html += '<li>' + p + '</li>'; });
+                        html += '</ul>';
+                    }
+                    if (data.skipped.length > 0) {
+                        html += '<h6 class="text-secondary"><i class="bi bi-skip-forward"></i> Skipped (already exist)</h6><ul class="small">';
+                        data.skipped.forEach(function(p) { html += '<li>' + p + '</li>'; });
+                        html += '</ul>';
+                    }
+                    if (data.failed.length > 0) {
+                        html += '<h6 class="text-danger"><i class="bi bi-x-circle"></i> Failed</h6><ul class="small">';
+                        data.failed.forEach(function(f) { html += '<li>' + f.path + ' — ' + f.reason + '</li>'; });
+                        html += '</ul>';
+                    }
+                }
+                content.innerHTML = html;
+            } catch (e) {
+                loading.style.display = 'none';
+                content.style.display = 'block';
+                content.innerHTML = '<div class="alert alert-danger">Network error: ' + e.message + '</div>';
+            }
+        });
+    }
 </script>
 
 <%- include('partials/footer') %>
