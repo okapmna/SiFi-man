@@ -4,6 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
 const pool = require('../config/database');
+const { getStorage } = require('../services/storage');
+
+const storage = getStorage();
 
 // Rate limiter: firmware check (60 requests per 15 minutes)
 const checkLimiter = rateLimit({
@@ -84,11 +87,19 @@ router.get('/download/:filename', downloadLimiter, async (req, res) => {
 
         const filePath = rows[0].file_path;
 
-        if (fs.existsSync(filePath)) {
-            res.download(filePath);
-        } else {
-            res.status(404).json({ status: 'error', message: 'Firmware file missing on disk' });
+        // Prioritaskan Supabase signed URL (CDN, lebih cepat)
+        const signedUrl = await storage.getDownloadUrl(filePath);
+        if (signedUrl) {
+            return res.redirect(signedUrl);
         }
+
+        // Fallback ke local filesystem
+        const localPath = storage.getLocalPath(filePath);
+        if (localPath && fs.existsSync(localPath)) {
+            return res.download(localPath);
+        }
+
+        res.status(404).json({ status: 'error', message: 'Firmware file not found' });
     } catch (err) {
         console.error('Download error:', err);
         res.status(500).json({ status: 'error', message: 'Internal Server Error' });

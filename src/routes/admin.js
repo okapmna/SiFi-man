@@ -10,6 +10,9 @@ const pool = require('../config/database');
 const sessionAuth = require('../middleware/sessionAuth');
 const permissionCheck = require('../middleware/permissionCheck');
 const { addLog, getLogs } = require('../middleware/auditLog');
+const { getStorage } = require('../services/storage');
+
+const storage = getStorage();
 
 // Helper: robust is_active conversion (handles boolean, number, string, Buffer)
 function isActive(val) {
@@ -20,11 +23,8 @@ function isActive(val) {
 // ==========================================
 // MULTER SETUP FOR ADMIN UPLOAD
 // ==========================================
-const ensureDir = (dir) => {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-};
 const tempDir = path.join(__dirname, '../../firmware_storage/temp');
-ensureDir(tempDir);
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
 const upload = multer({
     dest: tempDir,
@@ -519,12 +519,11 @@ router.get('/firmwares', async (req, res) => {
         // Back-fill file_size from disk for firmwares missing it in DB
         const enriched = firmwares.map(f => {
             let fileSize = (f.file_size !== null && f.file_size !== undefined) ? Number(f.file_size) : null;
-            if (!fileSize && f.file_path) {
+            if (!fileSize && f.file_path && storage.getLocalPath(f.file_path)) {
                 try {
                     const stat = fs.statSync(f.file_path);
                     fileSize = stat.size;
                 } catch (e) {
-                    // file may not exist on disk
                     fileSize = null;
                 }
             }
@@ -599,15 +598,9 @@ router.delete('/firmwares/:id', async (req, res) => {
 
         const { file_path: filePath, version, type_name } = rows[0];
 
-        // Remove file from disk first, then DB
+        // Remove file from storage first, then DB
         if (filePath) {
-            try {
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                }
-            } catch (fileErr) {
-                console.error('Failed to delete file:', fileErr);
-            }
+            await storage.delete(filePath);
         }
 
         await conn.query('DELETE FROM firmwares WHERE id = ?', [firmwareId]);
@@ -661,7 +654,7 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
     }
 
     let conn;
-    let finalPath;
+    let savedPath;
     try {
         conn = await pool.getConnection();
 
@@ -673,19 +666,15 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         const deviceTypeId = rows[0].id;
         const trustedName = rows[0].type_name;
 
-        // Build file paths using DB-trusted device type name
-        const targetDir = path.join(__dirname, '../../firmware_storage', trustedName);
-        ensureDir(targetDir);
-
         const ext = path.extname(req.file.originalname);
         const finalFilename = `${trustedName}_${version}_${Date.now()}${ext}`;
-        finalPath = path.join(targetDir, finalFilename);
 
-        // Move file from temp to final destination
-        fs.renameSync(req.file.path, finalPath);
+        // Save file via storage service (local or Supabase)
+        savedPath = await storage.save(req.file.path, trustedName, finalFilename);
 
         // Calculate SHA256 checksum and file size
-        const fileBuffer = fs.readFileSync(finalPath);
+        const localPath = storage.getLocalPath(savedPath) || req.file.path;
+        const fileBuffer = fs.readFileSync(localPath);
         const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
         const fileSize = fileBuffer.length;
 
@@ -698,7 +687,7 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
 
         await conn.query(
             'INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, is_active, uploaded_by, source_repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [version, deviceTypeId, finalFilename, finalPath, checksum, fileSize, notes || null, isActive, req.session.username, source_repo || null]
+            [version, deviceTypeId, finalFilename, savedPath, checksum, fileSize, notes || null, isActive, req.session.username, source_repo || null]
         );
 
         await addLog({ action: isActive ? 'firmware_uploaded_active' : 'firmware_uploaded', entity_type: 'firmware', details: `Uploaded firmware ${version} for ${trustedName} (${finalFilename})`, performed_by: req.session.username, ip_address: req.ip });
@@ -706,7 +695,7 @@ router.post('/upload', upload.single('firmware'), async (req, res) => {
         res.redirect('/admin/firmwares?success=Firmware+uploaded+successfully');
     } catch (err) {
         console.error('Admin upload error:', err);
-        if (finalPath && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+        if (savedPath) await storage.delete(savedPath).catch(() => {});
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         res.redirect('/admin/upload?error=Upload+failed');
     } finally {

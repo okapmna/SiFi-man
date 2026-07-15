@@ -7,17 +7,15 @@ const auth = require('../middleware/auth');
 const fs = require('fs');
 const crypto = require('crypto');
 const { addLog } = require('../middleware/auditLog');
+const { getStorage } = require('../services/storage');
 
-// Helper to ensure directory exists
-const ensureDir = (dir) => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-};
+const storage = getStorage();
 
-// Ensure temp directory exists
+// Ensure temp directory exists (always local, even with Supabase)
 const tempDir = path.join(__dirname, '../../firmware_storage/temp');
-ensureDir(tempDir);
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+}
 
 // Configure storage - Upload to a temp directory first
 const upload = multer({ 
@@ -45,11 +43,11 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
     }
 
     let conn;
-    let finalPath;
+    let savedPath;
     try {
         conn = await pool.getConnection();
         
-        // 1. Validate device_type exists FIRST (prevent path traversal)
+        // 1. Validate device_type exists FIRST
         let rows = await conn.query("SELECT id, type_name FROM device_types WHERE type_name = ?", [device_type]);
         
         if (rows.length === 0) {
@@ -63,25 +61,21 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
         const deviceTypeId = rows[0].id;
         const trustedName = rows[0].type_name;
 
-        // Build file paths using DB-trusted device type name
-        const targetDir = path.join(__dirname, '../../firmware_storage', trustedName);
-        ensureDir(targetDir);
-
         const ext = path.extname(req.file.originalname);
         const finalFilename = `${trustedName}_${version}_${Date.now()}${ext}`;
-        finalPath = path.join(targetDir, finalFilename);
 
-        // Move file from temp to final destination
-        fs.renameSync(req.file.path, finalPath);
-        console.log(`File moved to: ${finalPath}`);
+        // Save file via storage service (local or Supabase)
+        savedPath = await storage.save(req.file.path, trustedName, finalFilename);
+        console.log(`File saved to: ${savedPath}`);
 
         // Calculate checksum (SHA256) and file size
-        const fileBuffer = fs.readFileSync(finalPath);
+        const localPath = storage.getLocalPath(savedPath) || req.file.path;
+        const fileBuffer = fs.readFileSync(localPath);
         const fileSize = fileBuffer.length;
         const computedChecksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
         if (providedChecksum && computedChecksum !== providedChecksum) {
-            if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+            await storage.delete(savedPath);
             return res.status(400).json({
                 status: 'error',
                 message: `SHA256 checksum mismatch. Provided: ${providedChecksum}, Computed: ${computedChecksum}`
@@ -91,7 +85,7 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
         // 2. Insert into firmwares table using device_type_id
         await conn.query(
             "INSERT INTO firmwares (version, device_type_id, filename, file_path, checksum, file_size, notes, uploaded_by, source_repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [version, deviceTypeId, finalFilename, finalPath, computedChecksum, fileSize, release_notes || null, uploaded_by || 'api_key', source_repo || null]
+            [version, deviceTypeId, finalFilename, savedPath, computedChecksum, fileSize, release_notes || null, uploaded_by || 'api_key', source_repo || null]
         );
 
         await addLog({
@@ -114,12 +108,12 @@ router.post('/', auth, upload.single('firmware'), async (req, res) => {
                 uploaded_by: uploaded_by || 'api_key',
                 release_notes: release_notes || null,
                 source_repo: source_repo || null,
-                storage_path: finalPath
+                storage_path: savedPath
             }
         });
     } catch (err) {
         console.error('Upload error:', err);
-        if (finalPath && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
+        if (savedPath) await storage.delete(savedPath).catch(() => {});
         if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         res.status(500).json({ status: 'error', message: 'An error occurred during upload processing' });
     } finally {
